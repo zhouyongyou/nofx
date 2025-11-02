@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"nofx/config"
 	"nofx/decision"
 	"nofx/logger"
 	"nofx/market"
@@ -1073,11 +1074,74 @@ func (at *AutoTrader) getCandidateCoins() ([]decision.CandidateCoin, error) {
 func normalizeSymbol(symbol string) string {
 	// 转为大写
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
-	
+
 	// 确保以USDT结尾
 	if !strings.HasSuffix(symbol, "USDT") {
 		symbol = symbol + "USDT"
 	}
-	
+
 	return symbol
+}
+
+// ReloadAIModelConfig 重新加载AI模型配置（热更新）
+// 这个方法允许在运行时更新AI模型配置，无需重启trader
+func (at *AutoTrader) ReloadAIModelConfig(modelConfig *config.AIModelConfig) error {
+	if modelConfig == nil {
+		return fmt.Errorf("模型配置为空")
+	}
+
+	log.Printf("🔄 [%s] 重新加载AI模型配置...", at.name)
+
+	// 更新AI模型相关配置
+	at.config.CustomModelName = modelConfig.CustomModelName
+	at.config.CustomAPIURL = modelConfig.CustomAPIURL
+
+	// 根据不同的AI provider更新对应的API Key
+	switch modelConfig.Provider {
+	case "deepseek":
+		at.config.DeepSeekKey = modelConfig.APIKey
+		at.config.CustomAPIKey = modelConfig.APIKey
+		log.Printf("✓ [%s] DeepSeek配置已更新: Model=%s, BaseURL=%s",
+			at.name, at.config.CustomModelName, at.config.CustomAPIURL)
+	case "qwen":
+		at.config.QwenKey = modelConfig.APIKey
+		log.Printf("✓ [%s] Qwen配置已更新: Model=%s",
+			at.name, at.config.CustomModelName)
+	case "custom":
+		at.config.CustomAPIKey = modelConfig.APIKey
+		log.Printf("✓ [%s] 自定义AI配置已更新: URL=%s, Model=%s",
+			at.name, at.config.CustomAPIURL, at.config.CustomModelName)
+	default:
+		return fmt.Errorf("不支持的AI provider: %s", modelConfig.Provider)
+	}
+
+	// 重新初始化MCP客户端以应用新配置
+	if err := at.reinitializeMCPClient(); err != nil {
+		return fmt.Errorf("重新初始化MCP客户端失败: %w", err)
+	}
+
+	log.Printf("✅ [%s] AI模型配置热更新完成", at.name)
+	return nil
+}
+
+// reinitializeMCPClient 重新初始化MCP客户端
+func (at *AutoTrader) reinitializeMCPClient() error {
+	// 根据当前配置重新设置MCP客户端
+	if at.config.AIModel == "custom" || at.config.CustomAPIURL != "" {
+		at.mcpClient.SetCustomAPI(at.config.CustomAPIURL, at.config.CustomAPIKey, at.config.CustomModelName)
+		log.Printf("🔧 [MCP] 使用自定义API: %s (模型: %s)", at.config.CustomAPIURL, at.config.CustomModelName)
+	} else if at.config.AIModel == "qwen" {
+		at.mcpClient.SetQwenAPIKey(at.config.QwenKey, "", at.config.CustomModelName)
+		log.Printf("🔧 [MCP] Qwen使用自定义Model: %s", at.config.CustomModelName)
+	} else if at.config.AIModel == "deepseek" {
+		at.mcpClient.SetDeepSeekAPIKey(at.config.DeepSeekKey, at.config.CustomAPIURL, at.config.CustomModelName)
+		if at.config.CustomAPIURL != "" {
+			log.Printf("🔧 [MCP] DeepSeek使用自定义BaseURL: %s", at.config.CustomAPIURL)
+		}
+		if at.config.CustomModelName != "" {
+			log.Printf("🔧 [MCP] DeepSeek使用自定义Model: %s", at.config.CustomModelName)
+		}
+	}
+
+	return nil
 }
