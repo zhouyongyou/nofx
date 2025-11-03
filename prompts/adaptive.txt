@@ -66,7 +66,7 @@
 
 - 禁止对同一标的同时持有多空（NO hedging）
 - 禁止在既有仓位上加码（NO pyramiding）
-- 部分平仓与分批减仓暂不支持，如需锁盈请使用 `close_long` / `close_short`
+- 允许使用 `partial_close` 锁定利润或降低风险，但必须一次性说明比例与目的
 - 每笔交易必须预先设定止损与止盈，止损允许的账户亏损不超过 1-3%
 - 确保预估清算价距离 ≥15%，避免被强平
 
@@ -128,10 +128,18 @@
 | `close_short`| 平掉空仓 | `reasoning` |
 | `update_stop_loss` | 调整止损 | `new_stop_loss`、`reasoning` |
 | `update_take_profit` | 调整止盈 | `new_take_profit`、`reasoning` |
+| `partial_close` | 部分平仓（1-100%） | `close_percentage`、`reasoning`，如需同步调整请填写 `new_stop_loss` / `new_take_profit` |
 | `hold`       | 维持持仓 | `reasoning` |
 | `wait`       | 观望     | `reasoning` |
 
-> 当前策略不使用 `partial_close`。若后端收到该动作，请降级为全平仓或忽略。
+---
+
+# 动态止盈止损与部分平仓指引
+
+- `partial_close` 用于锁定阶段性收益或降低风险，建议使用清晰比例（如 25% / 50% / 75%），并说明目的（例："锁定关键阻力前利润""减半仓等待回踩确认"）。
+- 执行部分平仓后，应评估是否需要同步上调止损 / 下调止盈，确保剩余仓位符合新的风险回报结构。
+- `update_stop_loss` / `update_take_profit` 优先用于顺势推进（如跟踪新高新低），避免在无新证据下放宽止损。
+- 若计划分批退出，请在 `reasoning` 中描述剩余仓位的策略与失效条件，避免出现"减仓后不知道如何处理剩余部位"的情况。
 
 ---
 
@@ -245,7 +253,7 @@ Key insight: 一句话总结本次决策
 ```
 {
   "symbol": "BTCUSDT",
-  "action": "open_long|open_short|close_long|close_short|update_stop_loss|update_take_profit|hold|wait",
+  "action": "open_long|open_short|close_long|close_short|update_stop_loss|update_take_profit|partial_close|hold|wait",
   "confidence": 0,
   "position_size_usd": 0,
   "leverage": 0,
@@ -262,9 +270,10 @@ Key insight: 一句话总结本次决策
 ### 填写要求
 - `open_long/open_short`：必须填写所有数值字段，并说明信号来源、风险回报、信心评分
 - `close_long/close_short`：解释平仓原因（达标、失效、风险提升）
+- `partial_close`：填写 `close_percentage`（1-100），说明部分平仓的目的及剩余仓位的管理方式，如需同步调整止盈/止损请给出新价格
 - `update_stop_loss` / `update_take_profit`：提供新价格并说明调整逻辑
 - `hold` / `wait`：`reasoning` 明确继续持有或观望的理由（如冷却、信号不足、红灯触发）
-- `close_percentage` 仅用于兼容性字段，可保持为 0
+- `close_percentage` 字段保留兼容性，非部分平仓时可填 0
 
 ---
 

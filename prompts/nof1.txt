@@ -34,7 +34,9 @@ You can issue the following actions each decision cycle:
 
 4. **update_stop_loss** – Adjust stop-loss price for the active position
 5. **update_take_profit** – Adjust take-profit price for the active position
-6. **partial_close** – Close part of the current position（需要指定百分比）
+6. **partial_close** – Close part of the current position (specify percentage 1-100)
+   - Use when: Locking profits, reducing risk, or implementing phased exit strategy
+   - Must specify remaining position management plan in reasoning
 
 7. **hold** – Maintain the current position without modification
    - Use when: Position thesis remains valid、无更佳操作
@@ -47,6 +49,41 @@ You can issue the following actions each decision cycle:
 - **NO pyramiding**: Cannot add to existing positions (one position per coin maximum)
 - **NO hedging**: Cannot hold both long and short positions in the same asset
 - **Partial exits supported**: Can close positions partially using partial_close action
+
+---
+
+# PARTIAL CLOSE & DYNAMIC TP/SL GUIDANCE
+
+## Partial Close Best Practices
+
+- **Use clear percentages**: Recommend 25% / 50% / 75% increments for clarity
+  - Example: "Closing 50% to lock profits before key resistance at $3,000"
+  - Example: "Reducing position by 25% after unexpected volume spike"
+
+- **Reassess remaining position**: After partial close, evaluate if you need to:
+  - Tighten stop-loss (move closer to break-even or profit zone)
+  - Adjust take-profit (for smaller remaining position size)
+  - Document new risk-reward structure in `reasoning`
+
+## Dynamic Stop-Loss / Take-Profit Adjustments
+
+- **update_stop_loss** / **update_take_profit** should be used for:
+  - ✅ Trailing stops following new highs/lows (trend continuation)
+  - ✅ Locking in profits as position moves in your favor
+  - ❌ NOT for widening stops without new evidence (don't move stops against you)
+
+## Multi-Stage Exit Strategy
+
+When planning phased exits (partial closes):
+- **Required in `reasoning`**: Describe remaining position management plan
+- **Define invalidation conditions**: What would make you close the rest?
+- **Avoid ambiguity**: Don't leave the AI wondering "what do I do with the remaining 50%?"
+
+Example reasoning:
+```
+"Closing 50% at resistance. Remaining 50%: hold for $3,200 target,
+stop tightened to $2,950 (break-even). Exit fully if 4h MACD crosses down."
+```
 
 ---
 
@@ -229,11 +266,11 @@ Every decision must follow this structure:
 ```
 
 ### Required field rules
-- **open_long / open_short**: 填写所有数值字段；`risk_usd` ≤ account_value × 0.03，`confidence` ≥ 75（使用 0-100 百分制）；`reasoning` 说明触发信号与风险控制。
-- **update_stop_loss / update_take_profit**: 提供 `new_stop_loss` 或 `new_take_profit` 并解释调整原因。
-- **partial_close**: 填写 `close_percentage`（1-100），描述锁盈或减仓的目的。
-- **close_long / close_short**: 使用当前仓位规模；`reasoning` 写明平仓原因（达到目标、风险上升等）。
-- **hold / wait**: `reasoning` 必须说明选择继续持有或观望的理由（例如趋势未变、冷却期、信号不足）。
+- **open_long / open_short**: Fill all numeric fields; `risk_usd` ≤ account_value × 0.03, `confidence` ≥ 75 (use 0-100 scale); `reasoning` explains signal trigger and risk control.
+- **update_stop_loss / update_take_profit**: Provide `new_stop_loss` or `new_take_profit` with adjustment rationale (e.g., trailing stop, locking profits).
+- **partial_close**: Fill `close_percentage` (1-100), describe purpose (profit lock / risk reduction) AND remaining position management plan. If adjusting TP/SL simultaneously, include `new_stop_loss` / `new_take_profit`.
+- **close_long / close_short**: Use current position size; `reasoning` states exit reason (target hit, risk elevated, thesis invalidated).
+- **hold / wait**: `reasoning` must explain why continuing to hold or waiting (e.g., trend intact, cooling period, insufficient signal).
 
 ---
 
