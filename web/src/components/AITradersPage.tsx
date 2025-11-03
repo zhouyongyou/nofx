@@ -207,6 +207,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         ai_model_id: ai_model_id,  // 使用修正后的值
         exchange_id: exchange_id,  // 使用修正后的值
         initial_balance: data.initial_balance,
+        scan_interval_minutes: data.scan_interval_minutes,
         btc_eth_leverage: data.btc_eth_leverage,
         altcoin_leverage: data.altcoin_leverage,
         trading_symbols: data.trading_symbols,

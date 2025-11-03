@@ -210,6 +210,7 @@ type CreateTraderRequest struct {
 	AIModelID            string  `json:"ai_model_id" binding:"required"`
 	ExchangeID           string  `json:"exchange_id" binding:"required"`
 	InitialBalance       float64 `json:"initial_balance"`
+	ScanIntervalMinutes  int     `json:"scan_interval_minutes"`
 	BTCETHLeverage       int     `json:"btc_eth_leverage"`
 	AltcoinLeverage      int     `json:"altcoin_leverage"`
 	TradingSymbols       string  `json:"trading_symbols"`
@@ -332,6 +333,12 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		systemPromptTemplate = req.SystemPromptTemplate
 	}
 
+	// 设置扫描间隔默认值
+	scanIntervalMinutes := req.ScanIntervalMinutes
+	if scanIntervalMinutes <= 0 {
+		scanIntervalMinutes = 3 // 默认3分钟
+	}
+
 	// ✨ 查询交易所实际余额，覆盖用户输入
 	actualBalance := req.InitialBalance // 默认使用用户输入
 	exchanges, err := s.database.GetExchanges(userID)
@@ -416,7 +423,7 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		OverrideBasePrompt:   req.OverrideBasePrompt,
 		SystemPromptTemplate: systemPromptTemplate,
 		IsCrossMargin:        isCrossMargin,
-		ScanIntervalMinutes:  3, // 默认3分钟
+		ScanIntervalMinutes:  scanIntervalMinutes,
 		IsRunning:            false,
 	}
 
@@ -456,6 +463,7 @@ type UpdateTraderRequest struct {
 	CustomPrompt       string  `json:"custom_prompt"`
 	OverrideBasePrompt bool    `json:"override_base_prompt"`
 	IsCrossMargin      *bool   `json:"is_cross_margin"`
+	ScanIntervalMinutes int     `json:"scan_interval_minutes"`
 }
 
 // handleUpdateTrader 更新交易员配置
@@ -505,6 +513,12 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		altcoinLeverage = existingTrader.AltcoinLeverage // 保持原值
 	}
 
+	// 设置扫描间隔，允许更新
+	scanIntervalMinutes := req.ScanIntervalMinutes
+	if scanIntervalMinutes <= 0 {
+		scanIntervalMinutes = existingTrader.ScanIntervalMinutes // 保持原值
+	}
+
 	// 更新交易员配置
 	trader := &config.TraderRecord{
 		ID:                  traderID,
@@ -513,14 +527,14 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		AIModelID:           req.AIModelID,
 		ExchangeID:          req.ExchangeID,
 		InitialBalance:      req.InitialBalance,
-		BTCETHLeverage:      btcEthLeverage,
 		AltcoinLeverage:     altcoinLeverage,
-		TradingSymbols:      req.TradingSymbols,
-		CustomPrompt:        req.CustomPrompt,
-		OverrideBasePrompt:  req.OverrideBasePrompt,
-		IsCrossMargin:       isCrossMargin,
-		ScanIntervalMinutes: existingTrader.ScanIntervalMinutes, // 保持原值
-		IsRunning:           existingTrader.IsRunning,           // 保持原值
+		TradingSymbols:       req.TradingSymbols,
+		CustomPrompt:         req.CustomPrompt,
+		OverrideBasePrompt:   req.OverrideBasePrompt,
+		SystemPromptTemplate: existingTrader.SystemPromptTemplate, // 保持原值
+		IsCrossMargin:        isCrossMargin,
+		ScanIntervalMinutes:  scanIntervalMinutes,
+		IsRunning:            existingTrader.IsRunning, // 保持原值
 	}
 
 	// 更新数据库
@@ -868,12 +882,12 @@ func (s *Server) handleGetTraderConfig(c *gin.Context) {
 		"ai_model":               traderConfig.AIModelID, // 使用完整 ID
 		"exchange_id":            traderConfig.ExchangeID,
 		"initial_balance":        traderConfig.InitialBalance,
+		"scan_interval_minutes":  traderConfig.ScanIntervalMinutes,
 		"btc_eth_leverage":       traderConfig.BTCETHLeverage,
 		"altcoin_leverage":       traderConfig.AltcoinLeverage,
 		"trading_symbols":        traderConfig.TradingSymbols,
 		"custom_prompt":          traderConfig.CustomPrompt,
 		"override_base_prompt":   traderConfig.OverrideBasePrompt,
-		"system_prompt_template": traderConfig.SystemPromptTemplate, // 添加此字段
 		"is_cross_margin":        traderConfig.IsCrossMargin,
 		"use_coin_pool":          traderConfig.UseCoinPool,
 		"use_oi_top":             traderConfig.UseOITop,
