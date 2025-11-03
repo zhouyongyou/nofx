@@ -214,19 +214,12 @@ func (t *FuturesTrader) SetMarginMode(symbol string, isCrossMargin bool) error {
 	}
 
 	// 尝试设置仓位模式
-<<<<<<< HEAD
-	err := t.client.NewChangeMarginTypeService().
-		Symbol(symbol).
-		MarginType(marginType).
-		Do(context.Background())
-=======
 	err := t.callWithTimeSync("设置仓位模式", func() error {
 		return t.client.NewChangeMarginTypeService().
 			Symbol(symbol).
 			MarginType(marginType).
 			Do(context.Background())
 	})
->>>>>>> pr-313-time-sync
 
 	marginModeStr := "全仓"
 	if !isCrossMargin {

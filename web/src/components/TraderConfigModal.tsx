@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import type { AIModel, Exchange, CreateTraderRequest } from '../types';
 
+// WebSocket 流數限制常量
+const MAX_SYMBOLS = 250; // Binance WebSocket 限制：1024 流 / 4 時間週期 = 250 幣種
+const WARNING_THRESHOLD = 200; // 接近上限時顯示警告
+
 // 提取下划线后面的名称部分
 function getShortName(fullName: string): string {
   const parts = fullName.split('_');
@@ -385,6 +389,73 @@ export function TraderConfigModal({
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* 幣種數量提示 */}
+                {selectedCoins.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {/* 當前數量顯示 */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[#848E9C]">
+                        已選擇 <span className={`font-semibold ${
+                          selectedCoins.length > MAX_SYMBOLS ? 'text-[#F6465D]' :
+                          selectedCoins.length > WARNING_THRESHOLD ? 'text-[#F0B90B]' :
+                          'text-[#02C076]'
+                        }`}>{selectedCoins.length}</span> 個幣種
+                      </span>
+                      <span className="text-[#848E9C]">上限：{MAX_SYMBOLS} 個</span>
+                    </div>
+
+                    {/* 進度條 */}
+                    <div className="w-full h-1 bg-[#2B3139] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          selectedCoins.length > MAX_SYMBOLS ? 'bg-[#F6465D]' :
+                          selectedCoins.length > WARNING_THRESHOLD ? 'bg-[#F0B90B]' :
+                          'bg-[#02C076]'
+                        }`}
+                        style={{ width: `${Math.min((selectedCoins.length / MAX_SYMBOLS) * 100, 100)}%` }}
+                      />
+                    </div>
+
+                    {/* 警告提示 */}
+                    {selectedCoins.length > WARNING_THRESHOLD && selectedCoins.length <= MAX_SYMBOLS && (
+                      <div className="flex items-start gap-2 p-3 bg-[#2B1F0B] border border-[#F0B90B]/30 rounded text-xs">
+                        <svg className="w-4 h-4 text-[#F0B90B] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div className="flex-1">
+                          <div className="text-[#F0B90B] font-semibold mb-1">接近幣種數量上限</div>
+                          <div className="text-[#848E9C]">
+                            當前：{selectedCoins.length} 個幣種 × 4 時間週期 = {selectedCoins.length * 4} 個 WebSocket 流
+                            <br />
+                            Binance 限制：1024 流/連接
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 錯誤提示 */}
+                    {selectedCoins.length > MAX_SYMBOLS && (
+                      <div className="flex items-start gap-2 p-3 bg-[#2B1315] border border-[#F6465D]/30 rounded text-xs">
+                        <svg className="w-4 h-4 text-[#F6465D] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="flex-1">
+                          <div className="text-[#F6465D] font-semibold mb-1">幣種數量超過上限！</div>
+                          <div className="text-[#848E9C]">
+                            超過 {MAX_SYMBOLS} 個幣種會導致：
+                            <br />
+                            • WebSocket 流數超過 Binance 限制（1024 流）
+                            <br />
+                            • <span className="text-[#F6465D] font-semibold">系統會自動忽略前 {MAX_SYMBOLS} 個之後的幣種</span>
+                            <br />
+                            • 建議減少幣種數量或使用幣池功能
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
