@@ -485,8 +485,8 @@ func (at *AutoTrader) runCycle() error {
 	// ctx.Positions 是周期开始时的持仓，不反映本周期的变化
 	currentPositionsAfterExecution, err := at.trader.GetPositions()
 	if err != nil {
-		log.Printf("⚠ 更新持仓快照失败，无法获取当前持仓: %v", err)
-		// 即使失败也不影响主流程，下一周期可能会有误报但不会崩溃
+		log.Printf("⚠ 更新持仓快照失败，清空快照以避免误报: %v", err)
+		at.lastPositions = make(map[string]*PositionSnapshot) // 清空快照防止误报
 	} else {
 		// 将原始持仓数据转换为快照格式
 		snapshots := make([]PositionSnapshot, 0, len(currentPositionsAfterExecution))
@@ -1470,19 +1470,3 @@ func (at *AutoTrader) detectAutoClosedPositions(currentPositions []decision.Posi
 }
 
 // updatePositionSnapshots 更新持仓快照（用于下一周期检测自动平仓）
-func (at *AutoTrader) updatePositionSnapshots(currentPositions []decision.PositionInfo) {
-	// 清空旧的快照
-	at.lastPositions = make(map[string]*PositionSnapshot)
-
-	// 记录当前所有持仓
-	for _, pos := range currentPositions {
-		posKey := pos.Symbol + "_" + pos.Side
-		at.lastPositions[posKey] = &PositionSnapshot{
-			Symbol:     pos.Symbol,
-			Side:       pos.Side,
-			Quantity:   pos.Quantity,
-			EntryPrice: pos.EntryPrice,
-			Leverage:   pos.Leverage,
-		}
-	}
-}
