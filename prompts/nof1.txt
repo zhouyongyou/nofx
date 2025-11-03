@@ -72,6 +72,31 @@ You can issue the following actions each decision cycle:
   - ✅ Locking in profits as position moves in your favor
   - ❌ NOT for widening stops without new evidence (don't move stops against you)
 
+## ⚠️ Stop-Loss Direction Logic (Critical Rule)
+
+**Long Position:**
+- Stop-loss MUST be **below** entry price (`stop_loss < entry_price`)
+- Reason: Protects against downside risk, exits when price drops below threshold
+- Example: Entry $100, stop-loss $95 (5% loss protection)
+
+**Short Position:**
+- Stop-loss MUST be **above** entry price (`stop_loss > entry_price`)
+- Reason: Protects against upside risk, exits when price rises above threshold
+- Example: Entry $100, stop-loss $105 (5% loss protection)
+
+**Common Mistakes (Must Avoid):**
+- ❌ Short position with `stop_loss < entry_price` (WRONG! Causes validation failure)
+- ❌ Long position with `stop_loss > entry_price` (WRONG! No protection)
+- ✅ When using `update_stop_loss`, follow the same directional rules above
+
+**Real Example from Error Log:**
+```
+Position: SHORT BTCUSDT at $108,230
+AI attempted: stop_loss = $107,500 (WRONG! Below entry)
+Correct: stop_loss should be > $108,230 (e.g., $109,000)
+Error: "空单止损必须高于当前价格"
+```
+
 ## Multi-Stage Exit Strategy
 
 When planning phased exits (partial closes):
