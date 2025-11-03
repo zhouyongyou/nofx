@@ -861,8 +861,7 @@ func (s *Server) handleGetTraderConfig(c *gin.Context) {
 		}
 	}
 
-	// 返回完整的 AIModelID（如 "admin_deepseek"），不要截断
-	// 前端需要完整 ID 来验证模型是否存在
+	// 返回完整的模型ID，不做转換，保持与前端模型列表一致
 	result := map[string]interface{}{
 		"trader_id":              traderConfig.ID,
 		"trader_name":            traderConfig.Name,
