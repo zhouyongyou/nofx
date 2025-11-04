@@ -71,8 +71,18 @@
 
 ## 仓位计算公式
 
-**Position Size (USD) = Available Cash × Leverage × Allocation %**
-**Position Size (Coins) = Position Size (USD) / Current Price**
+**重要**：position_size_usd 是**名义价值**（包含杠杆），非保证金需求。
+
+**计算步骤**：
+1. **可用保证金** = Available Cash × 0.95 × Allocation %（预留5%给手续费）
+2. **名义价值** = 可用保证金 × Leverage
+3. **position_size_usd** = 名义价值（这是 JSON 中应填写的值）
+4. **Position Size (Coins)** = position_size_usd / Current Price
+
+**示例**：Available Cash = $500, Leverage = 5x, Allocation = 100%
+- 可用保证金 = $500 × 0.95 × 100% = $475
+- position_size_usd = $475 × 5 = **$2,375** ← JSON 中填写此值
+- 实际占用保证金 = $475，剩余 $25 用于手续费
 
 ## 杠杆选择指引
 

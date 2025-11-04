@@ -758,6 +758,32 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 		return err
 	}
 
+	// ⚠️ 保证金验证：防止保证金不足错误（code=-2019）
+	// position_size_usd 是名义价值（包含杠杆），实际需要的保证金 = position_size_usd / leverage
+	requiredMargin := decision.PositionSizeUSD / float64(decision.Leverage)
+
+	// 获取当前可用余额
+	balance, err := at.trader.GetBalance()
+	if err != nil {
+		return fmt.Errorf("获取账户余额失败: %w", err)
+	}
+	availableBalance := 0.0
+	if avail, ok := balance["availableBalance"].(float64); ok {
+		availableBalance = avail
+	}
+
+	// 手续费估算（Taker费率 0.04%）
+	estimatedFee := decision.PositionSizeUSD * 0.0004
+	totalRequired := requiredMargin + estimatedFee
+
+	// 验证保证金充足（需要保证金 + 手续费 <= 可用余额）
+	if totalRequired > availableBalance {
+		return fmt.Errorf("❌ 保证金不足: 需要 %.2f USDT（保证金 %.2f + 手续费 %.2f），可用 %.2f USDT。建议降低仓位或杠杆",
+			totalRequired, requiredMargin, estimatedFee, availableBalance)
+	}
+
+	log.Printf("  ✓ 保证金检查通过: 需要 %.2f USDT，可用 %.2f USDT", totalRequired, availableBalance)
+
 	// 计算数量
 	quantity := decision.PositionSizeUSD / marketData.CurrentPrice
 	actionRecord.Quantity = quantity
@@ -816,6 +842,32 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 	if err != nil {
 		return err
 	}
+
+	// ⚠️ 保证金验证：防止保证金不足错误（code=-2019）
+	// position_size_usd 是名义价值（包含杠杆），实际需要的保证金 = position_size_usd / leverage
+	requiredMargin := decision.PositionSizeUSD / float64(decision.Leverage)
+
+	// 获取当前可用余额
+	balance, err := at.trader.GetBalance()
+	if err != nil {
+		return fmt.Errorf("获取账户余额失败: %w", err)
+	}
+	availableBalance := 0.0
+	if avail, ok := balance["availableBalance"].(float64); ok {
+		availableBalance = avail
+	}
+
+	// 手续费估算（Taker费率 0.04%）
+	estimatedFee := decision.PositionSizeUSD * 0.0004
+	totalRequired := requiredMargin + estimatedFee
+
+	// 验证保证金充足（需要保证金 + 手续费 <= 可用余额）
+	if totalRequired > availableBalance {
+		return fmt.Errorf("❌ 保证金不足: 需要 %.2f USDT（保证金 %.2f + 手续费 %.2f），可用 %.2f USDT。建议降低仓位或杠杆",
+			totalRequired, requiredMargin, estimatedFee, availableBalance)
+	}
+
+	log.Printf("  ✓ 保证金检查通过: 需要 %.2f USDT，可用 %.2f USDT", totalRequired, availableBalance)
 
 	// 计算数量
 	quantity := decision.PositionSizeUSD / marketData.CurrentPrice
@@ -953,8 +1005,8 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 		return fmt.Errorf("空单止损必须高于当前价格 (当前: %.2f, 新止损: %.2f)", marketData.CurrentPrice, decision.NewStopLoss)
 	}
 
-	// 取消旧的止损单（避免多个止损单共存）
-	if err := at.trader.CancelStopOrders(decision.Symbol); err != nil {
+	// 取消旧的止损单（只删除止损单，不影响止盈单）
+	if err := at.trader.CancelStopLossOrders(decision.Symbol); err != nil {
 		log.Printf("  ⚠ 取消旧止损单失败: %v", err)
 		// 不中断执行，继续设置新止损
 	}
@@ -1015,8 +1067,8 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 		return fmt.Errorf("空单止盈必须低于当前价格 (当前: %.2f, 新止盈: %.2f)", marketData.CurrentPrice, decision.NewTakeProfit)
 	}
 
-	// 取消旧的止盈单（避免多个止盈单共存）
-	if err := at.trader.CancelStopOrders(decision.Symbol); err != nil {
+	// 取消旧的止盈单（只删除止盈单，不影响止损单）
+	if err := at.trader.CancelTakeProfitOrders(decision.Symbol); err != nil {
 		log.Printf("  ⚠ 取消旧止盈单失败: %v", err)
 		// 不中断执行，继续设置新止盈
 	}

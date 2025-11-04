@@ -535,6 +535,22 @@ func (t *HyperliquidTrader) CancelStopOrders(symbol string) error {
 	return nil
 }
 
+// CancelStopLossOrders 仅取消止损单（Hyperliquid 暂无法区分止损和止盈，取消所有）
+func (t *HyperliquidTrader) CancelStopLossOrders(symbol string) error {
+	// Hyperliquid SDK 的 OpenOrder 结构不暴露 trigger 字段
+	// 无法区分止损和止盈单，因此取消该币种的所有挂单
+	log.Printf("  ⚠️ Hyperliquid 无法区分止损/止盈单，将取消所有挂单")
+	return t.CancelStopOrders(symbol)
+}
+
+// CancelTakeProfitOrders 仅取消止盈单（Hyperliquid 暂无法区分止损和止盈，取消所有）
+func (t *HyperliquidTrader) CancelTakeProfitOrders(symbol string) error {
+	// Hyperliquid SDK 的 OpenOrder 结构不暴露 trigger 字段
+	// 无法区分止损和止盈单，因此取消该币种的所有挂单
+	log.Printf("  ⚠️ Hyperliquid 无法区分止损/止盈单，将取消所有挂单")
+	return t.CancelStopOrders(symbol)
+}
+
 // GetMarketPrice 获取市场价格
 func (t *HyperliquidTrader) GetMarketPrice(symbol string) (float64, error) {
 	coin := convertSymbolToHyperliquid(symbol)

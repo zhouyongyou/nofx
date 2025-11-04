@@ -39,8 +39,15 @@ type Trader interface {
 	// CancelAllOrders 取消该币种的所有挂单
 	CancelAllOrders(symbol string) error
 
-	// CancelStopOrders 取消该币种的止盈/止损单（用于调整止盈止损位置）
+	// CancelStopOrders 取消该币种的止盈/止损单（已废弃：会同时删除止损和止盈）
+	// 请使用 CancelStopLossOrders 或 CancelTakeProfitOrders
 	CancelStopOrders(symbol string) error
+
+	// CancelStopLossOrders 仅取消止损单（修复 BUG：调整止损时不删除止盈）
+	CancelStopLossOrders(symbol string) error
+
+	// CancelTakeProfitOrders 仅取消止盈单（修复 BUG：调整止盈时不删除止损）
+	CancelTakeProfitOrders(symbol string) error
 
 	// FormatQuantity 格式化数量到正确的精度
 	FormatQuantity(symbol string, quantity float64) (string, error)

@@ -97,7 +97,8 @@ export function TraderConfigModal({
       });
     }
     // 确保旧数据也有默认的 system_prompt_template
-    if (traderData && !traderData.system_prompt_template) {
+    // 修复BUG：只处理 undefined，不覆盖已有值（包括空字符串）
+    if (traderData && traderData.system_prompt_template === undefined) {
       setFormData(prev => ({
         ...prev,
         system_prompt_template: 'default'
