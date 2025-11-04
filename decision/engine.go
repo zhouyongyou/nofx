@@ -15,6 +15,14 @@ import (
 	"github.com/samber/lo"
 )
 
+var (
+	reJSONFence      = regexp.MustCompile("(?is)```(?:json[a-z0-9_-]*)?\\s*(\\[\\s*\\{.*?\\}\\s*\\])\\s*```")
+	reJSONArray      = regexp.MustCompile(`(?is)\[\s*\{.*?\}\s*\]`)
+	reArrayHead      = regexp.MustCompile(`^\[\s*\{`)
+	reArrayOpenSpace = regexp.MustCompile(`^\[\s+\{`)
+	reInvisibleRunes = regexp.MustCompile("[\u200B\u200C\u200D\uFEFF]")
+)
+
 // PositionInfo 持仓信息
 type PositionInfo struct {
 	Symbol           string  `json:"symbol"`
@@ -497,8 +505,7 @@ func extractDecisions(response string) ([]Decision, error) {
 	s = fixMissingQuotes(s)
 
 	// 1) 优先从 ```json 代码块中提取
-	reFence := regexp.MustCompile(`(?is)` + "```json\\s*(\\[\\s*\\{.*?\\}\\s*\\])\\s*```")
-	if m := reFence.FindStringSubmatch(s); m != nil && len(m) > 1 {
+	if m := reJSONFence.FindStringSubmatch(s); m != nil && len(m) > 1 {
 		jsonContent := strings.TrimSpace(m[1])
 		jsonContent = compactArrayOpen(jsonContent) // 把 "[ {" 规整为 "[{"
 		jsonContent = fixMissingQuotes(jsonContent) // 二次修復（防止 regex 提取後還有全角）
@@ -514,8 +521,7 @@ func extractDecisions(response string) ([]Decision, error) {
 
 	// 2) 退而求其次：全文寻找首个对象数组
 	// 注意：此時 s 已經過 fixMissingQuotes()，全角字符已轉換為半角
-	reArray := regexp.MustCompile(`(?is)\[\s*\{.*?\}\s*\]`)
-	jsonContent := strings.TrimSpace(reArray.FindString(s))
+	jsonContent := strings.TrimSpace(reJSONArray.FindString(s))
 	if jsonContent == "" {
 		return nil, fmt.Errorf("无法找到JSON数组起始（已嘗試修復全角字符）\n原始響應前200字符: %s", s[:min(200, len(s))])
 	}
@@ -543,8 +549,7 @@ func validateJSONFormat(jsonStr string) error {
 	trimmed := strings.TrimSpace(jsonStr)
 
 	// 允许 [ 和 { 之间存在任意空白（含零宽）
-	reHead := regexp.MustCompile(`^\[\s*\{`)
-	if !reHead.MatchString(trimmed) {
+	if !reArrayHead.MatchString(trimmed) {
 		// 检查是否是纯数字/范围数组（常见错误）
 		if strings.HasPrefix(trimmed, "[") && !strings.Contains(trimmed[:min(20, len(trimmed))], "{") {
 			return fmt.Errorf("不是有效的决策数组（必须包含对象 {}），实际内容: %s", trimmed[:min(50, len(trimmed))])
@@ -603,14 +608,12 @@ func fixMissingQuotes(jsonStr string) string {
 
 // removeInvisibleRunes 去除零宽字符和 BOM，避免肉眼看不见的前缀破坏校验
 func removeInvisibleRunes(s string) string {
-	re := regexp.MustCompile(`[\u200B\u200C\u200D\uFEFF]`)
-	return re.ReplaceAllString(s, "")
+	return reInvisibleRunes.ReplaceAllString(s, "")
 }
 
 // compactArrayOpen 规整开头的 "[ {" → "[{"
 func compactArrayOpen(s string) string {
-	re := regexp.MustCompile(`^\[\s+\{`)
-	return re.ReplaceAllString(strings.TrimSpace(s), "[{")
+	return reArrayOpenSpace.ReplaceAllString(strings.TrimSpace(s), "[{")
 }
 
 // min 返回两个整数中的较小值
@@ -629,28 +632,6 @@ func validateDecisions(decisions []Decision, accountEquity float64, btcEthLevera
 		}
 	}
 	return nil
-}
-
-// findMatchingBracket 查找匹配的右括号
-func findMatchingBracket(s string, start int) int {
-	if start >= len(s) || s[start] != '[' {
-		return -1
-	}
-
-	depth := 0
-	for i := start; i < len(s); i++ {
-		switch s[i] {
-		case '[':
-			depth++
-		case ']':
-			depth--
-			if depth == 0 {
-				return i
-			}
-		}
-	}
-
-	return -1
 }
 
 // validateDecision 验证单个决策的有效性
