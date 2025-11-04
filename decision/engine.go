@@ -8,6 +8,7 @@ import (
 	"nofx/mcp"
 	"nofx/news"
 	"nofx/pool"
+	"regexp"
 	"strings"
 	"time"
 
@@ -291,14 +292,13 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString("5. 保证金: 总使用率 ≤ 90%\n\n")
 
 	// 3. 输出格式 - 动态生成（始终追加）
-	sb.WriteString("#输出格式\n\n")
-	sb.WriteString("第一步: 思维链（纯文本）\n")
-	sb.WriteString("简洁分析你的思考过程\n\n")
-	sb.WriteString("第二步: JSON决策数组\n\n")
-	sb.WriteString("```json\n[\n")
+	sb.WriteString("# 输出格式\n\n")
+	sb.WriteString("第一步: 思维链（纯文本，若有则放在前面）\n")
+	sb.WriteString("第二步: 只输出**一个 JSON 数组本体**（不要任何 Markdown 围栏/解释/前后缀/空行）\n\n")
+	sb.WriteString("[\n")
 	sb.WriteString(fmt.Sprintf("  {\"symbol\": \"BTCUSDT\", \"action\": \"open_short\", \"leverage\": %d, \"position_size_usd\": %.0f, \"stop_loss\": 97000, \"take_profit\": 91000, \"confidence\": 85, \"risk_usd\": 300, \"reasoning\": \"下跌趋势+MACD死叉\"},\n", btcEthLeverage, accountEquity*5))
 	sb.WriteString("  {\"symbol\": \"ETHUSDT\", \"action\": \"close_long\", \"reasoning\": \"止盈离场\"}\n")
-	sb.WriteString("]\n```\n\n")
+	sb.WriteString("]\n\n")
 	sb.WriteString("字段说明:\n")
 	sb.WriteString("- `action`: open_long | open_short | close_long | close_short | update_stop_loss | update_take_profit | partial_close | hold | wait\n")
 	sb.WriteString("- `confidence`: 0-100（开仓建议≥75）\n")
@@ -467,24 +467,36 @@ func extractCoTTrace(response string) string {
 
 // extractDecisions 提取JSON决策列表
 func extractDecisions(response string) ([]Decision, error) {
-	// 直接查找JSON数组 - 找第一个完整的JSON数组
-	arrayStart := strings.Index(response, "[")
-	if arrayStart == -1 {
-		return nil, fmt.Errorf("无法找到JSON数组起始")
+	// 预清洗：去零宽/BOM
+	s := removeInvisibleRunes(response)
+	s = strings.TrimSpace(s)
+
+	// 1) 优先从 ```json 代码块中提取
+	reFence := regexp.MustCompile(`(?is)` + "```json\\s*(\\[\\s*\\{.*?\\}\\s*\\])\\s*```")
+	if m := reFence.FindStringSubmatch(s); m != nil && len(m) > 1 {
+		jsonContent := strings.TrimSpace(m[1])
+		jsonContent = compactArrayOpen(jsonContent) // 把 "[ {" 规整为 "[{"
+		jsonContent = fixMissingQuotes(jsonContent)
+		if err := validateJSONFormat(jsonContent); err != nil {
+			return nil, fmt.Errorf("JSON格式验证失败: %w\nJSON内容: %s\n完整响应:\n%s", err, jsonContent, response)
+		}
+		var decisions []Decision
+		if err := json.Unmarshal([]byte(jsonContent), &decisions); err != nil {
+			return nil, fmt.Errorf("JSON解析失败: %w\nJSON内容: %s", err, jsonContent)
+		}
+		return decisions, nil
 	}
 
-	// 从 [ 开始，匹配括号找到对应的 ]
-	arrayEnd := findMatchingBracket(response, arrayStart)
-	if arrayEnd == -1 {
-		return nil, fmt.Errorf("无法找到JSON数组结束")
+	// 2) 退而求其次：全文寻找首个对象数组
+	reArray := regexp.MustCompile(`(?is)\[\s*\{.*?\}\s*\]`)
+	jsonContent := strings.TrimSpace(reArray.FindString(s))
+	if jsonContent == "" {
+		return nil, fmt.Errorf("无法找到JSON数组")
 	}
-
-	jsonContent := strings.TrimSpace(response[arrayStart : arrayEnd+1])
 
 	// 🔧 先修复全角字符和引号问题（必须在验证之前！）
 	// 修复常见的JSON格式错误：全角字符、缺少引号的字段值等
-	// 匹配: "reasoning": 内容"}  或  "reasoning": 内容}  (没有引号)
-	// 修复为: "reasoning": "内容"}
+	jsonContent = compactArrayOpen(jsonContent)
 	jsonContent = fixMissingQuotes(jsonContent)
 
 	// 🔧 验证 JSON 格式（检测常见错误）
@@ -505,13 +517,14 @@ func extractDecisions(response string) ([]Decision, error) {
 func validateJSONFormat(jsonStr string) error {
 	trimmed := strings.TrimSpace(jsonStr)
 
-	// 检查是否是决策对象数组（必须以 [{ 或 [ { 开头）
-	if !strings.HasPrefix(trimmed, "[{") && !strings.HasPrefix(trimmed, "[ {") {
+	// 允许 [ 和 { 之间存在任意空白（含零宽）
+	reHead := regexp.MustCompile(`^\[\s*\{`)
+	if !reHead.MatchString(trimmed) {
 		// 检查是否是纯数字/范围数组（常见错误）
 		if strings.HasPrefix(trimmed, "[") && !strings.Contains(trimmed[:min(20, len(trimmed))], "{") {
 			return fmt.Errorf("不是有效的决策数组（必须包含对象 {}），实际内容: %s", trimmed[:min(50, len(trimmed))])
 		}
-		return fmt.Errorf("JSON 必须以 [{ 开头（决策对象数组），实际: %s", trimmed[:min(20, len(trimmed))])
+		return fmt.Errorf("JSON 必须以 [{ 开头（允许空白），实际: %s", trimmed[:min(20, len(trimmed))])
 	}
 
 	// 检查是否包含范围符号 ~（LLM 常见错误）
@@ -561,6 +574,18 @@ func fixMissingQuotes(jsonStr string) string {
 	jsonStr = strings.ReplaceAll(jsonStr, "　", " ") // U+3000 全角空格
 
 	return jsonStr
+}
+
+// removeInvisibleRunes 去除零宽字符和 BOM，避免肉眼看不见的前缀破坏校验
+func removeInvisibleRunes(s string) string {
+	re := regexp.MustCompile(`[\u200B\u200C\u200D\uFEFF]`)
+	return re.ReplaceAllString(s, "")
+}
+
+// compactArrayOpen 规整开头的 "[ {" → "[{"
+func compactArrayOpen(s string) string {
+	re := regexp.MustCompile(`^\[\s+\{`)
+	return re.ReplaceAllString(strings.TrimSpace(s), "[{")
 }
 
 // min 返回两个整数中的较小值
