@@ -481,16 +481,16 @@ func extractDecisions(response string) ([]Decision, error) {
 
 	jsonContent := strings.TrimSpace(response[arrayStart : arrayEnd+1])
 
+	// 🔧 先修复全角字符和引号问题（必须在验证之前！）
+	// 修复常见的JSON格式错误：全角字符、缺少引号的字段值等
+	// 匹配: "reasoning": 内容"}  或  "reasoning": 内容}  (没有引号)
+	// 修复为: "reasoning": "内容"}
+	jsonContent = fixMissingQuotes(jsonContent)
+
 	// 🔧 验证 JSON 格式（检测常见错误）
 	if err := validateJSONFormat(jsonContent); err != nil {
 		return nil, fmt.Errorf("JSON格式验证失败: %w\nJSON内容: %s\n完整响应:\n%s", err, jsonContent, response)
 	}
-
-	// 🔧 修复常见的JSON格式错误：缺少引号的字段值
-	// 匹配: "reasoning": 内容"}  或  "reasoning": 内容}  (没有引号)
-	// 修复为: "reasoning": "内容"}
-	// 使用简单的字符串扫描而不是正则表达式
-	jsonContent = fixMissingQuotes(jsonContent)
 
 	// 解析JSON
 	var decisions []Decision
