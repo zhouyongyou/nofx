@@ -304,10 +304,10 @@ func (at *AutoTrader) Stop() {
 	log.Println("⏹ 自动交易系统停止")
 }
 
-// autoSyncBalanceIfNeeded 自动同步余额（每30分钟检查一次，变化>5%才更新）
+// autoSyncBalanceIfNeeded 自动同步余额（每10分钟检查一次，变化>5%才更新）
 func (at *AutoTrader) autoSyncBalanceIfNeeded() {
-	// 距离上次同步不足30分钟，跳过
-	if time.Since(at.lastBalanceSyncTime) < 30*time.Minute {
+	// 距离上次同步不足10分钟，跳过
+	if time.Since(at.lastBalanceSyncTime) < 10*time.Minute {
 		return
 	}
 
@@ -393,7 +393,7 @@ func (at *AutoTrader) runCycle() error {
 		log.Println("📅 日盈亏已重置")
 	}
 
-	// 3. 自动同步余额（每30分钟检查一次，充值/提现后自动更新）
+	// 3. 自动同步余额（每10分钟检查一次，充值/提现后自动更新）
 	at.autoSyncBalanceIfNeeded()
 
 	// 4. 收集交易上下文
