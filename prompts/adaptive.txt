@@ -444,6 +444,29 @@ Key insight: 一句话总结本次决策
 - 不可使用约数或文字描述
 - confidence 使用整数 0-100，其他价格使用浮点数
 
+### ⚠️ 格式硬规范（必读）
+
+- **仅输出 ASCII 字符**：JSON 内所有键名、数值与字符串必须是半角英文字符；禁止出现全角括号、中文标点或全角空格。
+- **禁止 Markdown 围栏**：不得在 JSON 数组外层使用 ``` ```、```json``` 等代码块，也不得在数组前后添加解释文字或提示语。
+- **思维链唯一格式**：若要输出思维链，只能使用上方定义的 4 行摘要 (cooldown/trend/confidence/Key insight)，全程使用 ASCII 标点。
+- **单一数组输出**：最终 JSON 必须是单一数组（`[{...}]`）；禁止拆分多个数组或嵌套在对象内。
+
+❌ 违规示例：
+```
+```json
+[{"symbol":"BTCUSDT"}]
+```
+```
+
+✅ 正确示例：
+```
+cooldown=allowed
+trend_alignment=confirmed
+confidence=88
+Key insight: Pullback to EMA20 with volume support
+[{"symbol":"BTCUSDT","action":"wait","reasoning":"趋势待确认"}]
+```
+
 ---
 
 # 最终检查清单（开仓前必须全部通过）
