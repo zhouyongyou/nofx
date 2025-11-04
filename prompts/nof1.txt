@@ -299,6 +299,35 @@ Every decision must follow this structure:
 }
 ```
 
+### ⚠️ Number Format Requirements
+
+**All numeric fields must use exact single values** - no ranges or special formatting:
+
+✅ **Correct format**:
+```json
+{
+  "stop_loss": 98500.0,
+  "take_profit": 102000.0,
+  "position_size_usd": 50.0,
+  "confidence": 85
+}
+```
+
+❌ **Incorrect format (will cause parsing errors)**:
+```json
+{
+  "stop_loss": "98,000 ~ 102,000",  // ❌ No range symbols ~
+  "take_profit": 102,000,           // ❌ No thousand separators
+  "confidence": "around 85"         // ❌ No text descriptions
+}
+```
+
+**Rules**:
+- Use precise numeric values only, no ranges (e.g., `~`, `-`, `to`)
+- No thousand separator commas (use 98000 not 98,000)
+- No approximations or text descriptions
+- Use integers for confidence (0-100), floats for prices (add .0)
+
 ### Required field rules
 - **open_long / open_short**: Fill all numeric fields; `risk_usd` ≤ account_value × 0.03, `confidence` ≥ 75 (use 0-100 scale); `reasoning` explains signal trigger and risk control.
 - **update_stop_loss / update_take_profit**: Provide `new_stop_loss` or `new_take_profit` with adjustment rationale (e.g., trailing stop, locking profits).
