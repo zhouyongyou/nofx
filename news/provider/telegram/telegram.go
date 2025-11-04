@@ -14,6 +14,13 @@ import (
 	"github.com/samber/lo"
 )
 
+var (
+	reHTMLTag     = regexp.MustCompile(`\<[\S\s]+?\>`)
+	reStyleBlock  = regexp.MustCompile(`\<style[\S\s]+?\</style\>`)
+	reScriptBlock = regexp.MustCompile(`\<script[\S\s]+?\</script\>`)
+	reMultiSpace  = regexp.MustCompile(`\s{2,}`)
+)
+
 // Message 表示 Telegram 消息结构
 type Message struct {
 	MessageID string   `json:"messageId"`
@@ -268,27 +275,19 @@ func splitLast(s, sep string) []string {
 
 // stripHTML 移除字符串中的所有 HTML 标签，只保留纯文本
 func stripHTML(s string) string {
-	// 将HTML标签全转换成小写（确保匹配大小写不敏感的标签）
-	re := regexp.MustCompile(`\<[\S\s]+?\>`)
-	s = re.ReplaceAllStringFunc(s, strings.ToLower)
+	// 先將 HTML 標籤統一成小寫字母，方便後續匹配
+	s = reHTMLTag.ReplaceAllStringFunc(s, strings.ToLower)
 
-	// 去除 <style> 标签及其内容
-	re = regexp.MustCompile(`\<style[\S\s]+?\</style\>`)
-	s = re.ReplaceAllString(s, "")
+	// 移除樣式與腳本區塊
+	s = reStyleBlock.ReplaceAllString(s, "")
+	s = reScriptBlock.ReplaceAllString(s, "")
 
-	// 去除 <script> 标签及其内容
-	re = regexp.MustCompile(`\<script[\S\s]+?\</script\>`)
-	s = re.ReplaceAllString(s, "")
+	// 將剩餘標籤替換為換行，保留文本結構
+	s = reHTMLTag.ReplaceAllString(s, "\n")
 
-	// 去除所有尖括号内的 HTML 代码，并换成换行符
-	re = regexp.MustCompile(`\<[\S\s]+?\>`)
-	s = re.ReplaceAllString(s, "\n")
+	// 收斂連續空白為單一換行
+	s = reMultiSpace.ReplaceAllString(s, "\n")
 
-	// 去除连续的换行符和空白字符
-	re = regexp.MustCompile(`\s{2,}`)
-	s = re.ReplaceAllString(s, "\n")
-
-	// 去除首尾的空白字符
 	return strings.TrimSpace(s)
 }
 
