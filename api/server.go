@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"nofx/auth"
 	"nofx/config"
@@ -527,6 +528,40 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		systemPromptTemplate = existingTrader.SystemPromptTemplate // 保持原值
 	}
 
+	// 🔒 保護 initial_balance 不被修改
+	initialBalance := existingTrader.InitialBalance
+	if req.InitialBalance > 0 {
+		// 檢查是否嘗試修改初始餘額（允許 0.01 USDT 的誤差）
+		diff := math.Abs(req.InitialBalance - existingTrader.InitialBalance)
+		if diff > 0.01 {
+			// 記錄警告日誌
+			log.Printf("⚠️ BLOCKED: User %s attempted to modify initial_balance | Trader=%s | Original=%.2f | Requested=%.2f | Diff=%.2f",
+				userID, traderID, existingTrader.InitialBalance, req.InitialBalance, diff)
+
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "不允許修改初始餘額",
+				"code":  "INITIAL_BALANCE_IMMUTABLE",
+				"details": gin.H{
+					"current_value":   existingTrader.InitialBalance,
+					"requested_value": req.InitialBalance,
+					"difference":      diff,
+					"trader_id":       traderID,
+					"trader_name":     existingTrader.Name,
+					"created_at":      existingTrader.CreatedAt,
+				},
+				"message": fmt.Sprintf(
+					"初始餘額是固定的基準值，創建後不可修改。\n\n"+
+						"當前初始餘額: %.2f USDT\n"+
+						"嘗試修改為: %.2f USDT\n\n"+
+						"如確實需要修改，請聯繫管理員。",
+					existingTrader.InitialBalance,
+					req.InitialBalance,
+				),
+			})
+			return
+		}
+	}
+
 	// 更新交易员配置
 	trader := &config.TraderRecord{
 		ID:                   traderID,
@@ -534,7 +569,7 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		Name:                 req.Name,
 		AIModelID:            req.AIModelID,
 		ExchangeID:           req.ExchangeID,
-		InitialBalance:       req.InitialBalance,
+		InitialBalance:       initialBalance,
 		BTCETHLeverage:       btcEthLeverage,
 		AltcoinLeverage:      altcoinLeverage,
 		TradingSymbols:       req.TradingSymbols,
@@ -1195,6 +1230,7 @@ func (s *Server) handleCompetition(c *gin.Context) {
 
 // handleEquityHistory 收益率历史数据
 func (s *Server) handleEquityHistory(c *gin.Context) {
+	userID := c.GetString("user_id")
 	_, traderID, err := s.getTraderFromQuery(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1229,19 +1265,13 @@ func (s *Server) handleEquityHistory(c *gin.Context) {
 		CycleNumber      int     `json:"cycle_number"`
 	}
 
-	// 从AutoTrader获取初始余额（用于计算盈亏百分比）
-	initialBalance := 0.0
-	if status := trader.GetStatus(); status != nil {
-		if ib, ok := status["initial_balance"].(float64); ok && ib > 0 {
-			initialBalance = ib
-		}
+	traderRecord, _, _, err := s.database.GetTraderConfig(userID, traderID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "无法获取交易员配置"})
+		return
 	}
 
-	// 如果无法从status获取，且有历史记录，则从第一条记录获取
-	if initialBalance == 0 && len(records) > 0 {
-		// 第一条记录的equity作为初始余额
-		initialBalance = records[0].AccountState.TotalBalance
-	}
+	initialBalance := traderRecord.InitialBalance
 
 	// 如果还是无法获取，返回错误
 	if initialBalance == 0 {
@@ -1253,16 +1283,9 @@ func (s *Server) handleEquityHistory(c *gin.Context) {
 
 	var history []EquityPoint
 	for _, record := range records {
-		// TotalBalance字段实际存储的是TotalEquity
 		totalEquity := record.AccountState.TotalBalance
-		// TotalUnrealizedProfit字段实际存储的是TotalPnL（相对初始余额）
-		totalPnL := record.AccountState.TotalUnrealizedProfit
-
-		// 计算盈亏百分比
-		totalPnLPct := 0.0
-		if initialBalance > 0 {
-			totalPnLPct = (totalPnL / initialBalance) * 100
-		}
+		totalPnL := totalEquity - initialBalance
+		totalPnLPct := (totalPnL / initialBalance) * 100
 
 		history = append(history, EquityPoint{
 			Timestamp:        record.Timestamp.Format("2006-01-02 15:04:05"),
