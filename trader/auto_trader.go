@@ -761,20 +761,28 @@ func (at *AutoTrader) buildTradingContext() (*decision.Context, error) {
 		performance = nil
 	}
 
-	// 6.提取新闻内容
+	// 6. 提取新闻内容（根据持仓和候选币种动态收集）
 	newsItem := make(map[string][]news.NewsItem)
 	for _, newspro := range at.newsProcessor {
-		// TODO: 此出是为后续扩展考虑,当前随意给了个值占位
-		newsMap, err := newspro.FetchNews([]string{"btc"}, 100)
+		// 收集需要新闻的币种（持仓 + 候选币前几个）
+		newsSymbols := at.extractNewsSymbols(positionInfos, candidateCoins)
+
+		if len(newsSymbols) == 0 {
+			log.Printf("⚠️  没有需要收集新闻的币种，跳过新闻收集")
+			continue
+		}
+
+		newsMap, err := newspro.FetchNews(newsSymbols, 100)
 		if err != nil {
 			log.Printf("⚠️  获取新闻内容失败: %v", err)
-
 			continue
 		}
 
 		for symbol, value := range newsMap {
 			newsItem[symbol] = append(newsItem[symbol], value...)
 		}
+
+		log.Printf("📰 收集了 %d 个币种的新闻: %v", len(newsSymbols), newsSymbols)
 	}
 
 	// 7. 构建上下文
@@ -1581,6 +1589,49 @@ func normalizeSymbol(symbol string) string {
 	}
 
 	return symbol
+}
+
+// extractNewsSymbols 提取需要收集新闻的币种（持仓 + 候选币前几个 + BTC）
+func (at *AutoTrader) extractNewsSymbols(positions []decision.PositionInfo, candidates []decision.CandidateCoin) []string {
+	const (
+		maxNewsSymbols         = 10 // 最多收集10个币种的新闻（避免请求过多）
+		maxCandidatesForNews   = 5  // 从候选币中取前5个
+	)
+
+	symbolSet := make(map[string]bool)
+	result := make([]string, 0, maxNewsSymbols)
+
+	// 1. 总是包含 BTC（市场风向标）
+	symbolSet["btc"] = true
+	result = append(result, "btc")
+
+	// 2. 添加所有持仓币种（这些是最重要的）
+	for _, pos := range positions {
+		// 转换为新闻 API 格式（小写，移除 USDT 后缀）
+		baseSymbol := strings.ToLower(strings.TrimSuffix(pos.Symbol, "USDT"))
+		if !symbolSet[baseSymbol] && len(result) < maxNewsSymbols {
+			symbolSet[baseSymbol] = true
+			result = append(result, baseSymbol)
+		}
+	}
+
+	// 3. 添加候选币种（前几个，按优先级）
+	for i, coin := range candidates {
+		if i >= maxCandidatesForNews {
+			break
+		}
+		if len(result) >= maxNewsSymbols {
+			break
+		}
+
+		baseSymbol := strings.ToLower(strings.TrimSuffix(coin.Symbol, "USDT"))
+		if !symbolSet[baseSymbol] {
+			symbolSet[baseSymbol] = true
+			result = append(result, baseSymbol)
+		}
+	}
+
+	return result
 }
 
 // detectAutoClosedPositions 检测自动平仓的持仓（止损/止盈触发）

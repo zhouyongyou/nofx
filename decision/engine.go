@@ -222,10 +222,31 @@ func fetchMarketDataForContext(ctx *Context) error {
 
 // calculateMaxCandidates 根据账户状态计算需要分析的候选币种数量
 func calculateMaxCandidates(ctx *Context) int {
-	// 直接返回候选池的全部币种数量
-	// 因为候选池已经在 auto_trader.go 中筛选过了
-	// 固定分析前20个评分最高的币种（来自AI500）
-	return len(ctx.CandidateCoins)
+	// ⚠️ 重要：限制候选币种数量，避免 Prompt 过大
+	// 根据持仓数量动态调整：持仓越少，可以分析更多候选币
+	const (
+		maxCandidatesWhenEmpty    = 30 // 无持仓时最多分析30个候选币
+		maxCandidatesWhenHolding1 = 25 // 持仓1个时最多分析25个候选币
+		maxCandidatesWhenHolding2 = 20 // 持仓2个时最多分析20个候选币
+		maxCandidatesWhenHolding3 = 15 // 持仓3个时最多分析15个候选币（避免 Prompt 过大）
+	)
+
+	positionCount := len(ctx.Positions)
+	var maxCandidates int
+
+	switch positionCount {
+	case 0:
+		maxCandidates = maxCandidatesWhenEmpty
+	case 1:
+		maxCandidates = maxCandidatesWhenHolding1
+	case 2:
+		maxCandidates = maxCandidatesWhenHolding2
+	default: // 3+ 持仓
+		maxCandidates = maxCandidatesWhenHolding3
+	}
+
+	// 返回实际候选币数量和上限中的较小值
+	return min(len(ctx.CandidateCoins), maxCandidates)
 }
 
 // buildSystemPromptWithCustom 构建包含自定义内容的 System Prompt
