@@ -41,6 +41,25 @@ type ConfigFile struct {
 	News               []config.NewsConfig `json:"news"`
 }
 
+// ensureConfigExists 确保config.json存在，如果不存在则从config.json.example复制
+func ensureConfigExists() error {
+	if _, err := os.Stat("config.json"); os.IsNotExist(err) {
+		log.Println("⚠️  config.json 不存在，從 config.json.example 複製...")
+
+		input, err := os.ReadFile("config.json.example")
+		if err != nil {
+			return fmt.Errorf("讀取 config.json.example 失敗: %w", err)
+		}
+
+		if err := os.WriteFile("config.json", input, 0644); err != nil {
+			return fmt.Errorf("創建 config.json 失敗: %w", err)
+		}
+
+		log.Println("✅ config.json 已自動創建")
+	}
+	return nil
+}
+
 // syncConfigToDatabase 从config.json读取配置并同步到数据库
 func syncConfigToDatabase(database *config.Database) error {
 	// 检查config.json是否存在
@@ -123,6 +142,11 @@ func main() {
 	fmt.Println("║    🤖 AI多模型交易系统 - 支持 DeepSeek & Qwen            ║")
 	fmt.Println("╚════════════════════════════════════════════════════════════╝")
 	fmt.Println()
+
+	// 確保配置文件存在（首次運行時自動創建）
+	if err := ensureConfigExists(); err != nil {
+		log.Fatalf("❌ 初始化配置文件失敗: %v", err)
+	}
 
 	// 初始化数据库配置
 	dbPath := "config.db"
