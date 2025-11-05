@@ -133,11 +133,8 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 
 	// 🔍 调试：打印API返回的完整摘要结构
 	summaryJSON, _ := json.MarshalIndent(summary, "  ", "  ")
-	log.Printf("🔍 [DEBUG] Hyperliquid Perpetuals %s 完整数据:", summaryType)
+	log.Printf("🔍 [DEBUG] Hyperliquid API %s 完整数据:", summaryType)
 	log.Printf("%s", string(summaryJSON))
-
-	// ⚠️ 关键修复：将 Spot 现货余额加入总余额
-	accountValue += spotUSDCBalance
 
 	// ⚠️ 关键修复：从所有持仓中累加真正的未实现盈亏
 	totalUnrealizedPnl := 0.0
@@ -154,40 +151,37 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 	// 需要返回"不包含未实现盈亏的钱包余额"
 	walletBalanceWithoutUnrealized := accountValue - totalUnrealizedPnl
 
-	// ⚠️ 优先使用Withdrawable字段（Hyperliquid API返回的真实可用余额）
+	// ✅ Step 4: 使用 Withdrawable 欄位（PR #443）
+	// Withdrawable 是官方提供的真实可提现余额，比简单计算更可靠
 	availableBalance := 0.0
 	if accountState.Withdrawable != "" {
 		withdrawable, err := strconv.ParseFloat(accountState.Withdrawable, 64)
-		if err == nil {
+		if err == nil && withdrawable > 0 {
 			availableBalance = withdrawable
-			log.Printf("✓ 使用Hyperliquid API的Withdrawable字段: %.2f USDT", availableBalance)
-		} else {
-			log.Printf("⚠️ 解析Withdrawable字段失败: %v，将使用计算值", err)
+			log.Printf("✓ 使用 Withdrawable 作为可用余额: %.2f", availableBalance)
 		}
 	}
 
-	// 后备方案：如果Withdrawable不可用，使用计算值（确保不为负数）
+	// 降级方案：如果没有 Withdrawable，使用简单计算
 	if availableBalance == 0 && accountState.Withdrawable == "" {
 		availableBalance = accountValue - totalMarginUsed
 		if availableBalance < 0 {
-			log.Printf("⚠️ [Hyperliquid] 计算的可用余额为负 (%.2f - %.2f = %.2f)，已调整为0。",
-				accountValue, totalMarginUsed, availableBalance)
-			log.Printf("   提示：这可能是因为Hyperliquid的TotalMarginUsed计算方式不同，或持仓处于高风险状态")
+			log.Printf("⚠️ 计算出的可用余额为负数 (%.2f)，重置为 0", availableBalance)
 			availableBalance = 0
 		}
 	}
 
-	// ✅ 正確邏輯：Spot 只加到總資產，不加到可用餘額
-	// 原因：Spot 和 Perpetuals 是獨立帳戶，Spot 的錢不能直接用於開倉
-	//      需要手動調用 ClassTransfer 才能轉帳
+	// ✅ Step 5: 正確處理 Spot + Perpetuals 余额
+	// 重要：Spot 只加到總資產，不加到可用餘額
+	//      原因：Spot 和 Perpetuals 是獨立帳戶，需手動 ClassTransfer 才能轉帳
 	totalWalletBalance := walletBalanceWithoutUnrealized + spotUSDCBalance
 
-	result["totalWalletBalance"] = totalWalletBalance      // 總資產（Perp錢包 + Spot）
-	result["availableBalance"] = availableBalance          // 可用餘額（僅 Perpetuals，不含 Spot）
-	result["totalUnrealizedProfit"] = totalUnrealizedPnl   // 未實現盈虧
-	result["spotBalance"] = spotUSDCBalance                // Spot 現貨餘額（單獨返回）
+	result["totalWalletBalance"] = totalWalletBalance    // 總資產（Perp + Spot）
+	result["availableBalance"] = availableBalance        // 可用餘額（僅 Perpetuals，不含 Spot）
+	result["totalUnrealizedProfit"] = totalUnrealizedPnl // 未實現盈虧（僅來自 Perpetuals）
+	result["spotBalance"] = spotUSDCBalance              // Spot 現貨餘額（單獨返回）
 
-	log.Printf("✓ Hyperliquid 账户总览:")
+	log.Printf("✓ Hyperliquid 完整账户:")
 	log.Printf("  • Spot 现货余额: %.2f USDC （需手动转账到 Perpetuals 才能开仓）", spotUSDCBalance)
 	log.Printf("  • Perpetuals 合约净值: %.2f USDC (钱包%.2f + 未实现%.2f)",
 		accountValue,
