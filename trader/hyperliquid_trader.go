@@ -171,15 +171,15 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 		}
 	}
 
-	// ✅ Step 5: 正確處理 Spot + Perpetuals 余额
-	// 重要：Spot 只加到總資產，不加到可用餘額
+	// ✅ Step 5: 正确处理 Spot + Perpetuals 余额
+	// 重要：Spot 只加到总资產，不加到可用餘额
 	//      原因：Spot 和 Perpetuals 是獨立帳戶，需手動 ClassTransfer 才能轉帳
 	totalWalletBalance := walletBalanceWithoutUnrealized + spotUSDCBalance
 
-	result["totalWalletBalance"] = totalWalletBalance    // 總資產（Perp + Spot）
-	result["availableBalance"] = availableBalance        // 可用餘額（僅 Perpetuals，不含 Spot）
-	result["totalUnrealizedProfit"] = totalUnrealizedPnl // 未實現盈虧（僅來自 Perpetuals）
-	result["spotBalance"] = spotUSDCBalance              // Spot 現貨餘額（單獨返回）
+	result["totalWalletBalance"] = totalWalletBalance    // 总资產（Perp + Spot）
+	result["availableBalance"] = availableBalance        // 可用餘额（僅 Perpetuals，不含 Spot）
+	result["totalUnrealizedProfit"] = totalUnrealizedPnl // 未实现盈虧（僅来自 Perpetuals）
+	result["spotBalance"] = spotUSDCBalance              // Spot 现貨餘额（单獨返回）
 
 	log.Printf("✓ Hyperliquid 完整账户:")
 	log.Printf("  • Spot 现货余额: %.2f USDC （需手动转账到 Perpetuals 才能开仓）", spotUSDCBalance)
@@ -187,9 +187,9 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 		accountValue,
 		walletBalanceWithoutUnrealized,
 		totalUnrealizedPnl)
-	log.Printf("  • Perpetuals 可用余额: %.2f USDC （可直接用於開倉）", availableBalance)
+	log.Printf("  • Perpetuals 可用余额: %.2f USDC （可直接用於开仓）", availableBalance)
 	log.Printf("  • 保证金占用: %.2f USDC", totalMarginUsed)
-	log.Printf("  • 總資產 (Perp+Spot): %.2f USDC", totalWalletBalance)
+	log.Printf("  • 总资產 (Perp+Spot): %.2f USDC", totalWalletBalance)
 	log.Printf("  ⭐ 总资产: %.2f USDC | Perp 可用: %.2f USDC | Spot 余额: %.2f USDC",
 		totalWalletBalance, availableBalance, spotUSDCBalance)
 
@@ -588,22 +588,56 @@ func (t *HyperliquidTrader) CancelStopOrders(symbol string) error {
 	// 因此暂时取消该币种的所有挂单（包括止盈止损单）
 	// 这是安全的，因为在设置新的止盈止损之前，应该清理所有旧订单
 	canceledCount := 0
+	triggeredCount := 0
 	for _, order := range openOrders {
 		if order.Coin == coin {
 			_, err := t.exchange.Cancel(t.ctx, coin, order.Oid)
 			if err != nil {
-				log.Printf("  ⚠ 取消订单失败 (oid=%d): %v", order.Oid, err)
+				errMsg := err.Error()
+
+				// ============ P3 修復：智能錯誤分类 ============
+				// 判斷錯誤类型：订单已觸发 vs 真实錯誤
+				if strings.Contains(errMsg, "Order does not exist") ||
+					strings.Contains(errMsg, "already filled") ||
+					strings.Contains(errMsg, "already triggered") ||
+					strings.Contains(errMsg, "Order not found") {
+					// 订单已觸发/成交/不存在 → 這是正常情況，不是錯誤
+					log.Printf("  ℹ️  订单 oid=%d 已觸发或成交，無需取消", order.Oid)
+					triggeredCount++
+					continue
+				}
+
+				if strings.Contains(errMsg, "permission") ||
+					strings.Contains(errMsg, "Unauthorized") ||
+					strings.Contains(errMsg, "API key") {
+					// 權限錯誤 → 這是嚴重問題
+					log.Printf("  🚨 權限錯誤 (oid=%d): %v", order.Oid, err)
+					log.Printf("  → 請檢查 API Key 配置或權限設置")
+					continue
+				}
+
+				// 其他未知錯誤 → 記錄但繼續
+				log.Printf("  ⚠️  取消订单失敗 (oid=%d): %v", order.Oid, err)
+				// ===================================================
 				continue
 			}
 			canceledCount++
 		}
 	}
 
-	if canceledCount == 0 {
-		log.Printf("  ℹ %s 没有挂单需要取消", symbol)
+	// ============ P3 修復：詳細的操作摘要 ============
+	if canceledCount == 0 && triggeredCount == 0 {
+		log.Printf("  ℹ️  %s 沒有掛单需要取消", symbol)
 	} else {
-		log.Printf("  ✓ 已取消 %s 的 %d 个挂单（包括止盈/止损单）", symbol, canceledCount)
+		if canceledCount > 0 && triggeredCount > 0 {
+			log.Printf("  ✅ 已取消 %s 的 %d 個掛单，%d 個已觸发/成交", symbol, canceledCount, triggeredCount)
+		} else if canceledCount > 0 {
+			log.Printf("  ✅ 已取消 %s 的 %d 個掛单（包括止盈/止損单）", symbol, canceledCount)
+		} else {
+			log.Printf("  ℹ️  %s 的 %d 個订单已觸发或成交，無需取消", symbol, triggeredCount)
+		}
 	}
+	// ===================================================
 
 	return nil
 }
