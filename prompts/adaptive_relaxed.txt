@@ -65,15 +65,15 @@
 **重要**：position_size_usd 是**名义价值**（包含杠杆），非保证金需求。
 
 **计算步骤**：
-1. **可用保证金** = Available Cash × 0.95（预留5%给手续费）
+1. **可用保证金** = Available Cash × 0.88（预留12%给手续费、滑点与清算保证金缓冲）
 2. **名义价值** = 可用保证金 × Leverage
 3. **position_size_usd** = 名义价值（这是 JSON 中应填写的值）
 4. **Position Size (Coins)** = position_size_usd / Current Price
 
 **示例**：Available Cash = $98.89, Leverage = 5x
-- 可用保证金 = $98.89 × 0.95 = $93.95
-- position_size_usd = $93.95 × 5 = **$469.75** ← JSON 中填写此值
-- 实际占用保证金 = $93.95，剩余 $4.94 用于手续费
+- 可用保证金 = $98.89 × 0.88 = $87.02
+- position_size_usd = $87.02 × 5 = **$435.10** ← JSON 中填写此值
+- 实际占用保证金 = $87.02，剩余 $11.87 用于手续费、滑点与清算保护
 
 ## 杠杆选择指引
 
