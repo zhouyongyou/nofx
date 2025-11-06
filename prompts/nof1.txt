@@ -118,15 +118,15 @@ stop tightened to $2,950 (break-even). Exit fully if 4h MACD crosses down."
 
 ## Calculation Steps:
 
-1. **Available Margin** = Available Cash × 0.95 × Allocation % (reserve 5% for fees)
+1. **Available Margin** = Available Cash × 0.95 (reserve 5% for fees & slippage buffer)
 2. **Notional Value** = Available Margin × Leverage
 3. **position_size_usd** = Notional Value (this is the value for JSON)
 4. **Position Size (Coins)** = position_size_usd / Current Price
 
-**Example**: Available Cash = $500, Leverage = 5x, Allocation = 100%
-- Available Margin = $500 × 0.95 × 100% = $475
+**Example**: Available Cash = $500, Leverage = 5x
+- Available Margin = $500 × 0.95 = $475
 - position_size_usd = $475 × 5 = **$2,375** ← Fill this value in JSON
-- Actual margin used = $475, remaining $25 for fees
+- Actual margin used ≈ $475, remaining $25 for fees & slippage
 
 ## Sizing Considerations
 
