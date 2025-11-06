@@ -114,22 +114,19 @@ stop tightened to $2,950 (break-even). Exit fully if 4h MACD crosses down."
 
 # POSITION SIZING FRAMEWORK
 
-**IMPORTANT**: `position_size_usd` is the **margin amount**, exchange will automatically calculate notional value based on leverage.
+**IMPORTANT**: `position_size_usd` is the **notional value** (includes leverage), NOT margin requirement.
 
 ## Calculation Steps:
 
-1. **Max Available Margin** = Available Cash × 0.95 (reserve 5% for fees & buffer)
-2. **Risk-Controlled Margin** = Account Equity × Risk Budget / Stop Loss Distance %
-3. **position_size_usd** = min(Max Available Margin, Risk-Controlled Margin) ← Fill this in JSON
-4. **Notional Value** = position_size_usd × Leverage (calculated by exchange)
-5. **Position Size (Coins)** = Notional Value / Current Price
+1. **Available Margin** = Available Cash × 0.95 × Allocation % (reserve 5% for fees)
+2. **Notional Value** = Available Margin × Leverage
+3. **position_size_usd** = Notional Value (this is the value for JSON)
+4. **Position Size (Coins)** = position_size_usd / Current Price
 
-**Example**: Available Cash = $500, Leverage = 5x, Risk Budget = 2%, Stop Distance = 2%
-- Max Available Margin = $500 × 0.95 = $475
-- Risk-Controlled Margin = $500 × 2% / 2% = $500 (theoretical)
-- position_size_usd = min($475, $500) = **$475** ← Fill this value in JSON
-- Notional Value = $475 × 5 = $2,375 (calculated by exchange)
-- Actual margin used ≈ $475, remaining $25 for fees & slippage
+**Example**: Available Cash = $500, Leverage = 5x, Allocation = 100%
+- Available Margin = $500 × 0.95 × 100% = $475
+- position_size_usd = $475 × 5 = **$2,375** ← Fill this value in JSON
+- Actual margin used = $475, remaining $25 for fees
 
 ## Sizing Considerations
 
