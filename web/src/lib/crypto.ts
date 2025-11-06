@@ -63,7 +63,7 @@ export async function encryptWithServerPublicKey(
     result.set(new Uint8Array(encryptedData), 4 + encryptedAESKey.byteLength + iv.length);
 
     // 6. Base64 編碼
-    return arrayBufferToBase64(result);
+    return arrayBufferToBase64(result.buffer);
   } catch (error) {
     console.error('加密失敗:', error);
     throw new Error('加密過程中發生錯誤，請檢查伺服器公鑰是否有效');
