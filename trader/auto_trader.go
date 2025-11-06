@@ -1348,9 +1348,9 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	remainingQuantity := totalQuantity - closeQuantity
 	remainingValue := remainingQuantity * markPrice
 
-	const MIN_POSITION_VALUE = 12.0 // 最小持仓价值 12 USDT（交易所底線 $10 + $2 安全緩衝）
+	const MIN_POSITION_VALUE = 10.0 // 最小持仓价值 10 USDT（對齊交易所底線，小倉位建議直接全平）
 
-	if remainingValue > 0 && remainingValue < MIN_POSITION_VALUE {
+	if remainingValue > 0 && remainingValue <= MIN_POSITION_VALUE {
 		log.Printf("⚠️ 检测到 partial_close 后剩余仓位 %.2f USDT < %.0f USDT",
 			remainingValue, MIN_POSITION_VALUE)
 		log.Printf("  → 当前仓位价值: %.2f USDT, 平仓 %.1f%%, 剩余: %.2f USDT",
