@@ -227,10 +227,20 @@ go run main.go
 
 ---
 
+## 📚 詳細文檔
+
+需要更深入的配置和優化指南？
+
+- **[Aliyun KMS 完整指南](docs/ALIYUN_KMS_GUIDE.md)** - 阿里雲 KMS 詳細配置、成本分析、性能優化
+- **[GCP KMS 配置指南](docs/GCP_KMS_SETUP.md)** - Google Cloud KMS 快速配置
+- **[完整部署指南](docs/ENCRYPTION_DEPLOYMENT.md)** - 生產環境部署、遷移、故障排除
+
+---
+
 ## 聯繫與支援
 
-- **文檔**: [ENCRYPTION_DEPLOYMENT.md](./ENCRYPTION_DEPLOYMENT.md)
 - **測試腳本**: `go test ./crypto -v`
 - **遷移腳本**: `go run scripts/migrate_encryption.go`
+- **GitHub Issues**: 報告問題或建議
 
 **記住：安全是一項持續的投資，而非一次性成本。**
