@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { api } from '../lib/api';
+import { cacheManager } from '../lib/cache';
 import type { TraderInfo, CreateTraderRequest, AIModel, Exchange } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { t, type Language } from '../i18n/translations';
@@ -52,7 +53,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
     oiTopUrl: ''
   });
 
-  const { data: traders, mutate: mutateTraders } = useSWR<TraderInfo[]>(
+  const { data: traders } = useSWR<TraderInfo[]>(
     'traders',
     api.getTraders,
     { refreshInterval: 5000 }
@@ -142,7 +143,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
       await api.createTrader(data);
       setShowCreateModal(false);
-      mutateTraders();
+      cacheManager.onTraderCreated();
     } catch (error) {
       console.error('Failed to create trader:', error);
       alert(t('createTraderFailed', language));
@@ -222,7 +223,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       await api.updateTrader(editingTrader.trader_id, request);
       setShowEditModal(false);
       setEditingTrader(null);
-      mutateTraders();
+      cacheManager.onTraderUpdated(editingTrader.trader_id);
     } catch (error) {
       console.error('Failed to update trader:', error);
       alert(t('updateTraderFailed', language));
@@ -234,7 +235,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
     try {
       await api.deleteTrader(traderId);
-      mutateTraders();
+      cacheManager.onTraderDeleted(traderId);
     } catch (error) {
       console.error('Failed to delete trader:', error);
       alert(t('deleteTraderFailed', language));
@@ -248,7 +249,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       } else {
         await api.startTrader(traderId);
       }
-      mutateTraders();
+      cacheManager.onTraderStateChanged(traderId);
     } catch (error) {
       console.error('Failed to toggle trader:', error);
       alert(t('operationFailed', language));
