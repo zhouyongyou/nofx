@@ -8,7 +8,7 @@ import (
 
 	"nofx/crypto"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func main() {
@@ -37,8 +37,8 @@ func main() {
 		log.Fatalf("❌ 備份失敗: %v", err)
 	}
 
-	// 3. 打開數據庫
-	db, err := sql.Open("sqlite3", dbPath)
+	// 3. 打開數據庫（使用 modernc.org/sqlite 純 Go 驅動）
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatalf("❌ 打開數據庫失敗: %v", err)
 	}
