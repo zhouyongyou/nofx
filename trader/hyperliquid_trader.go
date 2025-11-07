@@ -172,14 +172,14 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 	}
 
 	// ✅ Step 5: 正确处理 Spot + Perpetuals 余额
-	// 重要：Spot 只加到总资產，不加到可用餘额
-	//      原因：Spot 和 Perpetuals 是獨立帳戶，需手動 ClassTransfer 才能轉帳
+	// 重要：Spot 只加到总资产，不加到可用余额
+	//      原因：Spot 和 Perpetuals 是独立帐户，需手动 ClassTransfer 才能转账
 	totalWalletBalance := walletBalanceWithoutUnrealized + spotUSDCBalance
 
-	result["totalWalletBalance"] = totalWalletBalance    // 总资產（Perp + Spot）
-	result["availableBalance"] = availableBalance        // 可用餘额（僅 Perpetuals，不含 Spot）
-	result["totalUnrealizedProfit"] = totalUnrealizedPnl // 未实现盈虧（僅来自 Perpetuals）
-	result["spotBalance"] = spotUSDCBalance              // Spot 现貨餘额（单獨返回）
+	result["totalWalletBalance"] = totalWalletBalance    // 总资产（Perp + Spot）
+	result["availableBalance"] = availableBalance        // 可用余额（仅 Perpetuals，不含 Spot）
+	result["totalUnrealizedProfit"] = totalUnrealizedPnl // 未实现盈亏（仅来自 Perpetuals）
+	result["spotBalance"] = spotUSDCBalance              // Spot 现货余额（单独返回）
 
 	log.Printf("✓ Hyperliquid 完整账户:")
 	log.Printf("  • Spot 现货余额: %.2f USDC （需手动转账到 Perpetuals 才能开仓）", spotUSDCBalance)
@@ -187,9 +187,9 @@ func (t *HyperliquidTrader) GetBalance() (map[string]interface{}, error) {
 		accountValue,
 		walletBalanceWithoutUnrealized,
 		totalUnrealizedPnl)
-	log.Printf("  • Perpetuals 可用余额: %.2f USDC （可直接用於开仓）", availableBalance)
+	log.Printf("  • Perpetuals 可用余额: %.2f USDC （可直接用于开仓）", availableBalance)
 	log.Printf("  • 保证金占用: %.2f USDC", totalMarginUsed)
-	log.Printf("  • 总资產 (Perp+Spot): %.2f USDC", totalWalletBalance)
+	log.Printf("  • 总资产 (Perp+Spot): %.2f USDC", totalWalletBalance)
 	log.Printf("  ⭐ 总资产: %.2f USDC | Perp 可用: %.2f USDC | Spot 余额: %.2f USDC",
 		totalWalletBalance, availableBalance, spotUSDCBalance)
 
@@ -312,8 +312,10 @@ func (t *HyperliquidTrader) OpenLong(symbol string, quantity float64, leverage i
 	}
 
 	// ⚠️ 关键：根据币种精度要求，四舍五入数量
+	szDecimals := t.getSzDecimals(coin)
 	roundedQuantity := t.roundToSzDecimals(coin, quantity)
-	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d)", quantity, roundedQuantity, t.getSzDecimals(coin))
+	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d, 币种=%s)",
+		quantity, roundedQuantity, szDecimals, coin)
 
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	aggressivePrice := t.roundPriceToSigfigs(price * 1.01)
@@ -370,8 +372,10 @@ func (t *HyperliquidTrader) OpenShort(symbol string, quantity float64, leverage 
 	}
 
 	// ⚠️ 关键：根据币种精度要求，四舍五入数量
+	szDecimals := t.getSzDecimals(coin)
 	roundedQuantity := t.roundToSzDecimals(coin, quantity)
-	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d)", quantity, roundedQuantity, t.getSzDecimals(coin))
+	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d, 币种=%s)",
+		quantity, roundedQuantity, szDecimals, coin)
 
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	aggressivePrice := t.roundPriceToSigfigs(price * 0.99)
@@ -437,8 +441,10 @@ func (t *HyperliquidTrader) CloseLong(symbol string, quantity float64) (map[stri
 	}
 
 	// ⚠️ 关键：根据币种精度要求，四舍五入数量
+	szDecimals := t.getSzDecimals(coin)
 	roundedQuantity := t.roundToSzDecimals(coin, quantity)
-	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d)", quantity, roundedQuantity, t.getSzDecimals(coin))
+	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d, 币种=%s)",
+		quantity, roundedQuantity, szDecimals, coin)
 
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	aggressivePrice := t.roundPriceToSigfigs(price * 0.99)
@@ -509,8 +515,10 @@ func (t *HyperliquidTrader) CloseShort(symbol string, quantity float64) (map[str
 	}
 
 	// ⚠️ 关键：根据币种精度要求，四舍五入数量
+	szDecimals := t.getSzDecimals(coin)
 	roundedQuantity := t.roundToSzDecimals(coin, quantity)
-	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d)", quantity, roundedQuantity, t.getSzDecimals(coin))
+	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d, 币种=%s)",
+		quantity, roundedQuantity, szDecimals, coin)
 
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	aggressivePrice := t.roundPriceToSigfigs(price * 1.01)
@@ -793,7 +801,17 @@ func (t *HyperliquidTrader) roundToSzDecimals(coin string, quantity float64) flo
 	}
 
 	// 四舍五入
-	return float64(int(quantity*multiplier+0.5)) / multiplier
+	rounded := float64(int(quantity*multiplier+0.5)) / multiplier
+
+	// ⚠️ 关键修复：检测四舍五入后是否变成 0
+	if rounded == 0 && quantity > 0 {
+		log.Printf("❌ [精度问题] %s 数量 %.8f 四舍五入后变成 0（szDecimals=%d），强制使用最小单位",
+			coin, quantity, szDecimals)
+		// 使用最小单位（1 / 10^szDecimals）
+		rounded = 1.0 / multiplier
+	}
+
+	return rounded
 }
 
 // roundPriceToSigfigs 将价格四舍五入到5位有效数字

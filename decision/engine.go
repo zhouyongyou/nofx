@@ -18,7 +18,7 @@ import (
 
 var (
 	// ✅ 安全的正則：精確匹配 ```json 代碼塊
-	// 使用反引號 + 拼接避免轉義問題
+	// 使用反引號 + 拼接避免转义問題
 	reJSONFence      = regexp.MustCompile(`(?is)` + "```json\\s*(\\[\\s*\\{.*?\\}\\s*\\])\\s*```")
 	reJSONArray      = regexp.MustCompile(`(?is)\[\s*\{.*?\}\s*\]`)
 	reArrayHead      = regexp.MustCompile(`^\[\s*\{`)
@@ -394,7 +394,7 @@ func buildUserPrompt(ctx *Context) string {
 				}
 			}
 
-			// 計算倉位價值（用於 partial_close 檢查）
+			// 计算仓位价值（用于 partial_close 检查）
 			positionValue := math.Abs(pos.Quantity) * pos.MarkPrice
 
 			sb.WriteString(fmt.Sprintf("%d. %s %s | 入场价%.4f 当前价%.4f | 数量%.4f | 仓位价值%.2f USDT | 盈亏%+.2f%% | 杠杆%dx | 保证金%.0f | 强平价%.4f%s\n\n",
