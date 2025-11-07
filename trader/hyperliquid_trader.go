@@ -39,17 +39,26 @@ func NewHyperliquidTrader(privateKeyHex string, walletAddr string, testnet bool)
 		apiURL = hyperliquid.TestnetAPIURL
 	}
 
-	// 从私钥生成钱包地址（如果未提供）
+	// ⚠️ 安全检查：验证配置的正确性
+	agentAddr := crypto.PubkeyToAddress(*privateKey.Public().(*ecdsa.PublicKey)).Hex()
+
 	if walletAddr == "" {
-		pubKey := privateKey.Public()
-		publicKeyECDSA, ok := pubKey.(*ecdsa.PublicKey)
-		if !ok {
-			return nil, fmt.Errorf("无法转换公钥")
-		}
-		walletAddr = crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
-		log.Printf("✓ 从私钥自动生成钱包地址: %s", walletAddr)
+		return nil, fmt.Errorf("❌ 安全错误：未提供主钱包地址 (hyperliquid_wallet_addr)\n" +
+			"🔐 正确配置方式：\n" +
+			"  1. hyperliquid_private_key = API钱包私钥（Agent Key，余额应为0）\n" +
+			"  2. hyperliquid_wallet_addr = 主钱包地址（Main Wallet，有资金但不透露私钥）\n" +
+			"💡 请在 Hyperliquid 官网创建 Agent Wallet 并授权后再配置")
+	}
+
+	// 检查用户是否误用了 API 钱包地址作为主钱包地址
+	if strings.EqualFold(walletAddr, agentAddr) {
+		log.Printf("⚠️⚠️⚠️ 警告：主钱包地址 (%s) 与 API 钱包地址相同！", walletAddr)
+		log.Printf("   这意味着您可能在使用主钱包私钥，资金安全风险极高！")
+		log.Printf("   建议：立即在 Hyperliquid 官网创建独立的 Agent Wallet")
 	} else {
-		log.Printf("✓ 使用提供的钱包地址: %s", walletAddr)
+		log.Printf("✓ 使用 Agent Wallet 模式 (安全)")
+		log.Printf("  └─ API钱包地址: %s (用于签名)", agentAddr)
+		log.Printf("  └─ 主钱包地址: %s (持有资金)", walletAddr)
 	}
 
 	ctx := context.Background()
@@ -71,6 +80,25 @@ func NewHyperliquidTrader(privateKeyHex string, walletAddr string, testnet bool)
 	meta, err := exchange.Info().Meta(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("获取meta信息失败: %w", err)
+	}
+
+	// 🔍 安全检查：验证 API 钱包地址的余额（应该接近 0）
+	if !strings.EqualFold(walletAddr, agentAddr) {
+		agentState, err := exchange.Info().UserState(ctx, agentAddr)
+		if err == nil && agentState != nil {
+			agentBalance, _ := strconv.ParseFloat(agentState.CrossMarginSummary.AccountValue, 64)
+			if agentBalance > 100 { // 如果 API 钱包余额超过 100 USDC，强烈警告
+				log.Printf("🚨🚨🚨 严重安全警告 🚨🚨🚨")
+				log.Printf("API钱包地址 (%s) 有较大余额: %.2f USDC", agentAddr, agentBalance)
+				log.Printf("根据 Hyperliquid 安全最佳实践，API 钱包不应持有资金！")
+				log.Printf("建议：将资金转移到主钱包 (%s)，仅保留少量 Gas 费", walletAddr)
+				return nil, fmt.Errorf("安全检查失败：API钱包余额过高 (%.2f USDC)，请先转移资金", agentBalance)
+			} else if agentBalance > 10 {
+				log.Printf("⚠️ 注意：API钱包地址有少量余额 (%.2f USDC)，建议转移至主钱包", agentBalance)
+			} else {
+				log.Printf("✓ API钱包余额安全 (%.2f USDC)", agentBalance)
+			}
+		}
 	}
 
 	return &HyperliquidTrader{

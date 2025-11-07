@@ -21,9 +21,9 @@ type TraderConfig struct {
 	BinanceAPIKey    string `json:"binance_api_key,omitempty"`
 	BinanceSecretKey string `json:"binance_secret_key,omitempty"`
 
-	// Hyperliquid配置
-	HyperliquidPrivateKey string `json:"hyperliquid_private_key,omitempty"`
-	HyperliquidWalletAddr string `json:"hyperliquid_wallet_addr,omitempty"`
+	// Hyperliquid配置（Agent Wallet模式：私钥签名 + 主钱包地址）
+	HyperliquidPrivateKey string `json:"hyperliquid_private_key,omitempty"` // API钱包私钥（Agent Key，余额应为0）
+	HyperliquidWalletAddr string `json:"hyperliquid_wallet_addr,omitempty"` // 主钱包地址（Main Wallet，有资金但不透露私钥）
 	HyperliquidTestnet    bool   `json:"hyperliquid_testnet,omitempty"`
 
 	// Aster配置
