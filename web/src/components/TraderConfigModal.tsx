@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { AIModel, Exchange, CreateTraderRequest } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
+import { t } from '../i18n/translations';
 
 // WebSocket 流數限制常量
 const MAX_SYMBOLS = 250; // Binance WebSocket 限制：1024 流 / 4 時間週期 = 250 幣種
@@ -46,8 +48,9 @@ export function TraderConfigModal({
   isEditMode = false,
   availableModels = [],
   availableExchanges = [],
-  onSave 
+  onSave
 }: TraderConfigModalProps) {
+  const { language } = useLanguage();
   const [formData, setFormData] = useState<TraderConfigData>({
     trader_name: '',
     ai_model: '',
@@ -318,11 +321,24 @@ export function TraderConfigModal({
                   <input
                     type="number"
                     value={formData.initial_balance}
-                    onChange={(e) => handleInputChange('initial_balance', Number(e.target.value))}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      handleInputChange('initial_balance', value);
+                    }}
+                    onBlur={(e) => {
+                      // 失焦時強制最小值，統一箭頭調整和手動輸入的行為
+                      const value = Number(e.target.value);
+                      if (value < 100) {
+                        handleInputChange('initial_balance', 100);
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-[#0B0E11] border border-[#2B3139] rounded text-[#EAECEF] focus:border-[#F0B90B] focus:outline-none"
                     min="100"
                     step="100"
                   />
+                  <p className="text-xs text-[#848E9C] mt-1">
+                    最小金額 100 USDT（與步進值一致，輸入低於 100 將自動調整）
+                  </p>
                 </div>
               </div>
 
@@ -518,23 +534,72 @@ export function TraderConfigModal({
             <div className="space-y-4">
               {/* 系统提示词模板选择 */}
               <div>
-                <label className="text-sm text-[#EAECEF] block mb-2">系统提示词模板</label>
+                <label className="text-sm text-[#EAECEF] block mb-2">{t('systemPromptTemplate', language)}</label>
                 <select
                   value={formData.system_prompt_template}
                   onChange={(e) => handleInputChange('system_prompt_template', e.target.value)}
                   className="w-full px-3 py-2 bg-[#0B0E11] border border-[#2B3139] rounded text-[#EAECEF] focus:border-[#F0B90B] focus:outline-none"
                 >
-                  {promptTemplates.map(template => (
-                    <option key={template.name} value={template.name}>
-                      {template.name === 'default' ? 'Default (默认稳健)' :
-                       template.name === 'aggressive' ? 'Aggressive (激进)' :
-                       template.name.charAt(0).toUpperCase() + template.name.slice(1)}
-                    </option>
-                  ))}
+                  {promptTemplates.map(template => {
+                    // Template name mapping with i18n
+                    const getTemplateName = (name: string) => {
+                      const keyMap: Record<string, string> = {
+                        'default': 'promptTemplateDefault',
+                        'adaptive': 'promptTemplateAdaptive',
+                        'adaptive_moderate': 'promptTemplateAdaptiveModerate',
+                        'adaptive_relaxed': 'promptTemplateAdaptiveRelaxed',
+                        'adaptive_altcoin': 'promptTemplateAdaptiveAltcoin',
+                        'Hansen': 'promptTemplateHansen',
+                        'nof1': 'promptTemplateNof1',
+                        'taro_long_prompts': 'promptTemplateTaroLong',
+                      };
+                      const key = keyMap[name];
+                      return key ? t(key, language) : name.charAt(0).toUpperCase() + name.slice(1);
+                    };
+
+                    return (
+                      <option key={template.name} value={template.name}>
+                        {getTemplateName(template.name)}
+                      </option>
+                    );
+                  })}
                 </select>
-                <p className="text-xs text-[#848E9C] mt-1">
-                  选择预设的交易策略模板（包含交易哲学、风控原则等）
-                </p>
+
+                {/* 動態描述區域 */}
+                <div className="mt-2 p-3 rounded" style={{ background: 'rgba(240, 185, 11, 0.05)', border: '1px solid rgba(240, 185, 11, 0.15)' }}>
+                  <div className="text-xs font-semibold mb-1" style={{ color: '#F0B90B' }}>
+                    {(() => {
+                      const titleKeyMap: Record<string, string> = {
+                        'default': 'promptDescDefault',
+                        'adaptive': 'promptDescAdaptive',
+                        'adaptive_moderate': 'promptDescAdaptiveModerate',
+                        'adaptive_relaxed': 'promptDescAdaptiveRelaxed',
+                        'adaptive_altcoin': 'promptDescAdaptiveAltcoin',
+                        'Hansen': 'promptDescHansen',
+                        'nof1': 'promptDescNof1',
+                        'taro_long_prompts': 'promptDescTaroLong',
+                      };
+                      const key = titleKeyMap[formData.system_prompt_template];
+                      return key ? t(key, language) : t('promptDescDefault', language);
+                    })()}
+                  </div>
+                  <div className="text-xs" style={{ color: '#848E9C' }}>
+                    {(() => {
+                      const contentKeyMap: Record<string, string> = {
+                        'default': 'promptDescDefaultContent',
+                        'adaptive': 'promptDescAdaptiveContent',
+                        'adaptive_moderate': 'promptDescAdaptiveModerateContent',
+                        'adaptive_relaxed': 'promptDescAdaptiveRelaxedContent',
+                        'adaptive_altcoin': 'promptDescAdaptiveAltcoinContent',
+                        'Hansen': 'promptDescHansenContent',
+                        'nof1': 'promptDescNof1Content',
+                        'taro_long_prompts': 'promptDescTaroLongContent',
+                      };
+                      const key = contentKeyMap[formData.system_prompt_template];
+                      return key ? t(key, language) : t('promptDescDefaultContent', language);
+                    })()}
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
