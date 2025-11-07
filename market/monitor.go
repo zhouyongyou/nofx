@@ -154,13 +154,26 @@ func (m *WSMonitor) initializeHistoricalData() error {
 				log.Printf("已加载 %s 的历史K线数据-1h: %d 条", s, len(klines1h))
 			}
 
-			// 获取4小时历史K线数据
-			klines4h, err := apiClient.GetKlines(s, "4h", 100)
+			// 获取4小时历史K线数据（P0修复：添加重试机制）
+			var klines4h []Kline
+			var err error
+			for retry := 0; retry < 3; retry++ {
+				klines4h, err = apiClient.GetKlines(s, "4h", 100)
+				if err == nil && len(klines4h) > 0 {
+					break
+				}
+				if retry < 2 {
+					log.Printf("获取 %s 4h历史数据失败 (尝试 %d/3): %v，1秒后重试...", s, retry+1, err)
+					time.Sleep(1 * time.Second)
+				}
+			}
 			if err != nil {
-				log.Printf("获取 %s 4h历史数据失败: %v", s, err)
+				log.Printf("❌ 获取 %s 4h历史数据失败（已重试3次）: %v", s, err)
 			} else if len(klines4h) > 0 {
 				m.klineDataMap4h.Store(s, klines4h)
-				log.Printf("已加载 %s 的历史K线数据-4h: %d 条", s, len(klines4h))
+				log.Printf("✅ 已加载 %s 的历史K线数据-4h: %d 条", s, len(klines4h))
+			} else {
+				log.Printf("⚠️  WARNING: %s 4h数据为空（API返回成功但无数据）", s)
 			}
 		}(symbol)
 	}
