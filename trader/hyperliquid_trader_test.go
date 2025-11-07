@@ -146,7 +146,7 @@ func TestHyperliquidAgentWalletSecurity(t *testing.T) {
 func TestPrivateKeyDerivation(t *testing.T) {
 	// 已知的測試私鑰和對應地址
 	testPrivateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	expectedAddress := "0x14791697260E4c9A71f18484C9f997B308e59325" // 這個地址是從上述私鑰推導出的
+	expectedAddress := "0xFCAd0B19bB29D4674531d6f115237E16AfCE377c" // 這個地址是從上述私鑰推導出的
 
 	// 解析私鑰
 	privateKeyHex := strings.TrimPrefix(strings.ToLower(testPrivateKeyHex), "0x")
