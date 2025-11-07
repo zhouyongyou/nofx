@@ -317,6 +317,12 @@ func (t *HyperliquidTrader) OpenLong(symbol string, quantity float64, leverage i
 	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d, 币种=%s)",
 		quantity, roundedQuantity, szDecimals, coin)
 
+	// ✅ 安全检查：确保数量不为 0
+	if roundedQuantity == 0 {
+		return nil, fmt.Errorf("❌ 开多仓失败: 计算的数量太小（原始=%.8f, 四舍五入后=0），请增加保证金或降低杠杆",
+			quantity)
+	}
+
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	aggressivePrice := t.roundPriceToSigfigs(price * 1.01)
 	log.Printf("  💰 价格精度处理: %.8f -> %.8f (5位有效数字)", price*1.01, aggressivePrice)
@@ -376,6 +382,12 @@ func (t *HyperliquidTrader) OpenShort(symbol string, quantity float64, leverage 
 	roundedQuantity := t.roundToSzDecimals(coin, quantity)
 	log.Printf("  📏 数量精度处理: %.8f -> %.8f (szDecimals=%d, 币种=%s)",
 		quantity, roundedQuantity, szDecimals, coin)
+
+	// ✅ 安全检查：确保数量不为 0
+	if roundedQuantity == 0 {
+		return nil, fmt.Errorf("❌ 开空仓失败: 计算的数量太小（原始=%.8f, 四舍五入后=0），请增加保证金或降低杠杆",
+			quantity)
+	}
 
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	aggressivePrice := t.roundPriceToSigfigs(price * 0.99)
@@ -775,18 +787,23 @@ func (t *HyperliquidTrader) FormatQuantity(symbol string, quantity float64) (str
 // getSzDecimals 获取币种的数量精度
 func (t *HyperliquidTrader) getSzDecimals(coin string) int {
 	if t.meta == nil {
-		log.Printf("⚠️  meta信息为空，使用默认精度4")
+		log.Printf("❌ [Meta診斷] meta 信息为空！可能原因：")
+		log.Printf("   1. exchange.Info().Meta() 调用失败")
+		log.Printf("   2. 网络问题导致 API 请求失败")
+		log.Printf("   → 使用默认精度 4，可能导致订单失败")
 		return 4 // 默认精度
 	}
 
 	// 在meta.Universe中查找对应的币种
 	for _, asset := range t.meta.Universe {
 		if asset.Name == coin {
+			log.Printf("✓ [Meta診斷] 找到 %s 配置：szDecimals=%d", coin, asset.SzDecimals)
 			return asset.SzDecimals
 		}
 	}
 
-	log.Printf("⚠️  未找到 %s 的精度信息，使用默认精度4", coin)
+	log.Printf("⚠️  [Meta診斷] 未在 meta.Universe 中找到 %s，使用默认精度4", coin)
+	log.Printf("   meta.Universe 包含 %d 个币种", len(t.meta.Universe))
 	return 4 // 默认精度
 }
 
@@ -805,10 +822,15 @@ func (t *HyperliquidTrader) roundToSzDecimals(coin string, quantity float64) flo
 
 	// ⚠️ 关键修复：检测四舍五入后是否变成 0
 	if rounded == 0 && quantity > 0 {
-		log.Printf("❌ [精度问题] %s 数量 %.8f 四舍五入后变成 0（szDecimals=%d），强制使用最小单位",
+		minUnit := 1.0 / multiplier
+		log.Printf("❌ [精度问题] %s 数量 %.8f 四舍五入后变成 0（szDecimals=%d）",
 			coin, quantity, szDecimals)
-		// 使用最小单位（1 / 10^szDecimals）
-		rounded = 1.0 / multiplier
+		log.Printf("   建议：")
+		log.Printf("   1. 增加保证金（至少需要 %.2f 倍）", minUnit/quantity)
+		log.Printf("   2. 降低杠杆")
+		log.Printf("   3. 检查 Meta 信息是否正确加载（szDecimals 可能错误）")
+		// 注意：不再强制使用最小单位，而是返回 0 让后续检查捕获
+		return 0
 	}
 
 	return rounded
