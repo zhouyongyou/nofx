@@ -634,3 +634,47 @@ func parseFloat(v interface{}) (float64, error) {
 		return 0, fmt.Errorf("unsupported type: %T", v)
 	}
 }
+
+// isStaleData 检测数据是否陈旧（连续价格不变）
+// 修复 DOGEUSDT 式问题：连续 N 个周期价格完全不变表示数据源异常
+func isStaleData(klines []Kline, symbol string) bool {
+	if len(klines) < 5 {
+		return false // 数据不足，无法判断
+	}
+
+	// 检测阈值：连续 5 个 3 分钟周期价格完全不变（15分钟无波动）
+	const stalePriceThreshold = 5
+	const priceTolerancePct = 0.0001 // 0.01% 波动容忍度（避免误报）
+
+	// 取最后 stalePriceThreshold 个 K 线
+	recentKlines := klines[len(klines)-stalePriceThreshold:]
+	firstPrice := recentKlines[0].Close
+
+	// 检查是否所有价格都在容忍度内
+	for i := 1; i < len(recentKlines); i++ {
+		priceDiff := math.Abs(recentKlines[i].Close-firstPrice) / firstPrice
+		if priceDiff > priceTolerancePct {
+			return false // 有价格波动，数据正常
+		}
+	}
+
+	// 额外检查：MACD 和成交量
+	// 如果价格不变但 MACD/成交量有正常波动，可能是真实市场情况（极低波动）
+	// 检查成交量是否也为 0（数据彻底僵化）
+	allVolumeZero := true
+	for _, k := range recentKlines {
+		if k.Volume > 0 {
+			allVolumeZero = false
+			break
+		}
+	}
+
+	if allVolumeZero {
+		log.Printf("⚠️  %s 数据陈旧确认：价格不变 + 成交量为0", symbol)
+		return true
+	}
+
+	// 价格僵化但有成交量：可能是极低波动市场，允许通过但记录警告
+	log.Printf("⚠️  %s 检测到价格极度稳定（连续 %d 个周期无波动），但成交量正常", symbol, stalePriceThreshold)
+	return false
+}
