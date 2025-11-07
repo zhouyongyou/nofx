@@ -17,6 +17,7 @@ export function RegisterPage() {
   const [qrCodeURL, setQrCodeURL] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,8 +68,31 @@ export function RegisterPage() {
     setLoading(false);
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+      // 2秒后自动隐藏提示
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      // 降级方案：使用传统方法复制
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr);
+        setError(t('copyFailed', language) || 'Copy failed');
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   return (
@@ -213,16 +237,19 @@ export function RegisterPage() {
                   <div className="mt-2">
                     <p className="text-xs mb-1" style={{ color: '#848E9C' }}>{t('otpSecret', language)}</p>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 px-2 py-1 text-xs rounded font-mono" 
+                      <code className="flex-1 px-2 py-1 text-xs rounded font-mono"
                             style={{ background: '#2B3139', color: '#EAECEF' }}>
                         {otpSecret}
                       </code>
                       <button
                         onClick={() => copyToClipboard(otpSecret)}
-                        className="px-2 py-1 text-xs rounded"
-                        style={{ background: '#F0B90B', color: '#000' }}
+                        className="px-2 py-1 text-xs rounded transition-all"
+                        style={{
+                          background: copySuccess ? '#0ECB81' : '#F0B90B',
+                          color: '#000'
+                        }}
                       >
-                        {t('copy', language)}
+                        {copySuccess ? '✓ ' + (t('copied', language) || 'Copied!') : t('copy', language)}
                       </button>
                     </div>
                   </div>
