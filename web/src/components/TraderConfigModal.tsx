@@ -142,12 +142,6 @@ export function TraderConfigModal({
     fetchPromptTemplates();
   }, []);
 
-  // 当选择的币种改变时，更新输入框
-  useEffect(() => {
-    const symbolsString = selectedCoins.join(',');
-    setFormData(prev => ({ ...prev, trading_symbols: symbolsString }));
-  }, [selectedCoins]);
-
   if (!isOpen) return null;
 
   const handleInputChange = (field: keyof TraderConfigData, value: any) => {
@@ -162,11 +156,15 @@ export function TraderConfigModal({
 
   const handleCoinToggle = (coin: string) => {
     setSelectedCoins(prev => {
-      if (prev.includes(coin)) {
-        return prev.filter(c => c !== coin);
-      } else {
-        return [...prev, coin];
-      }
+      const newCoins = prev.includes(coin)
+        ? prev.filter(c => c !== coin)
+        : [...prev, coin];
+
+      // 同時更新 formData.trading_symbols
+      const symbolsString = newCoins.join(',');
+      setFormData(current => ({ ...current, trading_symbols: symbolsString }));
+
+      return newCoins;
     });
   };
 
