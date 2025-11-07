@@ -199,8 +199,8 @@ Available → Claimed → In Progress → Under Review → Paid
 - 必须引用悬赏 issue
 - 标签：`bounty: claimed`
 
-### 4. 安全漏洞
-- 用于安全问题（私密）
+### 4. 安全问题
+- 用于安全相关问题（私密）
 - 遵循负责任的披露
 - 标签：`type: security`
 

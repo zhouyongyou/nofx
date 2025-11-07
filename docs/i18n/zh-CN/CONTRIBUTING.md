@@ -418,7 +418,7 @@ docs: update Docker deployment guide
 5. **安全性**
    - 没有硬编码的密钥？
    - 输入验证？
-   - 没有已知漏洞？
+   - 没有已知安全问题？
 
 ### 回应反馈
 

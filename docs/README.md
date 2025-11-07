@@ -53,7 +53,7 @@ Welcome to the NOFX documentation! This page helps you find the right documentat
 | Document | Description | 描述 |
 |----------|-------------|------|
 | [Code of Conduct](../CODE_OF_CONDUCT.md) | Community guidelines | 社区行为准则 |
-| [Security Policy](../SECURITY.md) | Report security vulnerabilities | 报告安全漏洞 |
+| [Security Policy](../SECURITY.md) | Report security issues | 报告安全问题 |
 | [Bounty Guide](community/bounty-guide.md) | How to post bounty tasks | 如何发布悬赏任务 |
 | [Hyperliquid Bounty](community/bounty-hyperliquid.md) | Hyperliquid integration bounty | Hyperliquid 集成悬赏 |
 | [Aster Bounty](community/bounty-aster.md) | Aster DEX integration bounty | Aster DEX 集成悬赏 |
@@ -114,7 +114,7 @@ Welcome to the NOFX documentation! This page helps you find the right documentat
 | [License (MIT)](../LICENSE) | Open source license | 开源许可证 |
 | [Changelog (EN)](../CHANGELOG.md) | Version history and updates | 版本历史和更新 |
 | [Changelog (中文)](../CHANGELOG.zh-CN.md) | 版本历史和更新 | Version history and updates |
-| [Security Policy](../SECURITY.md) | Vulnerability disclosure | 漏洞披露政策 |
+| [Security Policy](../SECURITY.md) | Security disclosure policy | 安全问题披露政策 |
 | [Code of Conduct](../CODE_OF_CONDUCT.md) | Community standards | 社区标准 |
 
 ---
