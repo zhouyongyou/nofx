@@ -181,8 +181,13 @@ func (m *WSMonitor) initializeHistoricalData() error {
 			oiHistory, err := apiClient.GetOpenInterestHistory(s, "15m", 20)
 			normalizedSymbol := strings.ToUpper(s)
 
-			if err != nil {
-				log.Printf("⚠️  获取 %s OI历史数据失败: %v，尝试降级方案...", s, err)
+			if err != nil || len(oiHistory) == 0 {
+				// ✅ 修复：无论是API错误还是返回空数组，都尝试降级方案
+				if err != nil {
+					log.Printf("⚠️  获取 %s OI历史数据失败: %v，尝试降级方案...", s, err)
+				} else {
+					log.Printf("⚠️  %s OI历史数据为空（API返回成功但无数据），尝试降级方案...", normalizedSymbol)
+				}
 
 				// ✅ 修复：降级方案 - 至少获取当前OI作为第一个数据点
 				currentOI, currentErr := apiClient.GetOpenInterest(s)
@@ -192,10 +197,10 @@ func (m *WSMonitor) initializeHistoricalData() error {
 					// 创建单个数据点作为起始
 					oiHistory = []OISnapshot{{Value: currentOI.Latest, Timestamp: time.Now()}}
 					m.oiHistoryMap.Store(normalizedSymbol, oiHistory)
-					log.Printf("⚠️  %s 使用降级方案：仅1个OI数据点（%.0f），将在下次采集时增加", normalizedSymbol, currentOI.Latest)
+					log.Printf("✅ %s 使用降级方案：仅1个OI数据点（%.0f），将在15分钟后开始累积历史数据", normalizedSymbol, currentOI.Latest)
 				}
-			} else if len(oiHistory) > 0 {
-				// ✅ 修复：统一symbol格式后再存储（确保大小写一致）
+			} else {
+				// ✅ 成功获取历史数据
 				m.oiHistoryMap.Store(normalizedSymbol, oiHistory)
 
 				// 🔍 診斷：顯示時間範圍
@@ -204,8 +209,6 @@ func (m *WSMonitor) initializeHistoricalData() error {
 				timeSpan := newest.Sub(oldest)
 				log.Printf("✅ 已回填 %s 的历史OI数据: %d 个快照（时间范围: %s ~ %s，跨度 %.1f 小时）",
 					normalizedSymbol, len(oiHistory), oldest.Format("15:04"), newest.Format("15:04"), timeSpan.Hours())
-			} else {
-				log.Printf("⚠️  %s OI历史数据为空（API返回成功但无数据）", normalizedSymbol)
 			}
 		}(symbol)
 	}
