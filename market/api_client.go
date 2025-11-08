@@ -177,8 +177,9 @@ func (c *APIClient) GetOpenInterest(symbol string) (*OIData, error) {
 	oi, _ := strconv.ParseFloat(result.OpenInterest, 64)
 
 	return &OIData{
-		Latest:  oi,
-		Average: oi * 0.999, // 近似平均值
+		Latest:       oi,
+		Average:      oi * 0.999, // 近似平均值
+		ActualPeriod: "snapshot", // 標記為快照數據，非計算值
 	}, nil
 }
 

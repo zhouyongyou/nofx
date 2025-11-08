@@ -184,8 +184,13 @@ func (m *WSMonitor) initializeHistoricalData() error {
 			} else if len(oiHistory) > 0 {
 				// 批量存储历史快照到 oiHistoryMap
 				m.oiHistoryMap.Store(s, oiHistory)
-				log.Printf("✅ 已回填 %s 的历史OI数据: %d 个快照（覆盖 %.1f 小时）",
-					s, len(oiHistory), float64(len(oiHistory)*15)/60)
+
+				// 🔍 診斷：顯示時間範圍
+				oldest := oiHistory[0].Timestamp
+				newest := oiHistory[len(oiHistory)-1].Timestamp
+				timeSpan := newest.Sub(oldest)
+				log.Printf("✅ 已回填 %s 的历史OI数据: %d 个快照（时间范围: %s ~ %s，跨度 %.1f 小时）",
+					s, len(oiHistory), oldest.Format("15:04"), newest.Format("15:04"), timeSpan.Hours())
 			}
 		}(symbol)
 	}
@@ -403,45 +408,82 @@ func (m *WSMonitor) GetOIHistory(symbol string) []OISnapshot {
 	return value.([]OISnapshot)
 }
 
-// CalculateOIChange4h 计算4小时OI变化率
-func (m *WSMonitor) CalculateOIChange4h(symbol string, latestOI float64) float64 {
+// CalculateOIChange4h 计算4小时OI变化率（如果数据不足，降级到最长可用时间）
+// 返回：(变化率百分比, 实际时间段字符串)
+func (m *WSMonitor) CalculateOIChange4h(symbol string, latestOI float64) (float64, string) {
 	history := m.GetOIHistory(symbol)
 	if len(history) == 0 {
-		return 0.0 // 无历史数据，返回0
+		log.Printf("⚠️  %s: OI历史数据为空，无法计算变化率", symbol)
+		return 0.0, "N/A" // 无历史数据
 	}
 
-	// 找到4小时前的OI值（16个15分钟样本）
-	now := time.Now()
-	fourHoursAgo := now.Add(-4 * time.Hour)
-
-	// 查找最接近4小时前的数据点
-	var oi4hAgo float64
-	var closestTimeDiff time.Duration = 24 * time.Hour // 初始化为很大的值
-
-	for _, snapshot := range history {
-		timeDiff := snapshot.Timestamp.Sub(fourHoursAgo)
-		if timeDiff < 0 {
-			timeDiff = -timeDiff
-		}
-
-		if timeDiff < closestTimeDiff {
-			closestTimeDiff = timeDiff
-			oi4hAgo = snapshot.Value
-		}
+	// 只有 1 個數據點（剛啟動），無法計算變化率
+	if len(history) == 1 {
+		log.Printf("⚠️  %s: OI历史数据仅1个点（系统刚启动），需等待采集", symbol)
+		return 0.0, "N/A"
 	}
 
-	// 如果找不到合适的历史数据（时间差超过1小时），返回0
-	if closestTimeDiff > 1*time.Hour {
-		return 0.0
+	// 找到最早的数据点
+	oldest := history[0]
+	newest := history[len(history)-1]
+	timeSpan := newest.Timestamp.Sub(oldest.Timestamp)
+
+	// 計算實際可用的時間跨度
+	actualHours := timeSpan.Hours()
+
+	// 如果數據不足 4 小時，使用最早的數據點（降級策略）
+	var oiOld float64
+	var actualPeriod string
+
+	if actualHours >= 3.5 { // 接近 4 小時（考慮採樣誤差）
+		// 嘗試找 4 小時前的數據點
+		now := time.Now()
+		fourHoursAgo := now.Add(-4 * time.Hour)
+		var closestTimeDiff time.Duration = 24 * time.Hour
+
+		for _, snapshot := range history {
+			timeDiff := snapshot.Timestamp.Sub(fourHoursAgo)
+			if timeDiff < 0 {
+				timeDiff = -timeDiff
+			}
+			if timeDiff < closestTimeDiff {
+				closestTimeDiff = timeDiff
+				oiOld = snapshot.Value
+			}
+		}
+
+		// 如果找到的數據點時間差在 1 小時內，視為有效
+		if closestTimeDiff <= 1*time.Hour {
+			actualPeriod = "4h"
+		} else {
+			// 找不到 4h 前數據，降級使用最早數據點
+			oiOld = oldest.Value
+			actualPeriod = fmt.Sprintf("%.1fh", actualHours)
+		}
+	} else {
+		// 數據不足 4 小時，使用最早的數據點
+		oiOld = oldest.Value
+		actualPeriod = fmt.Sprintf("%.1fh", actualHours)
 	}
 
 	// 计算变化率
-	if oi4hAgo == 0 {
-		return 0.0
+	if oiOld == 0 {
+		log.Printf("⚠️  %s: 历史OI值为0，无法计算变化率", symbol)
+		return 0.0, "N/A"
 	}
 
-	change := ((latestOI - oi4hAgo) / oi4hAgo) * 100
-	return change
+	change := ((latestOI - oiOld) / oiOld) * 100
+
+	// 根據實際使用的時間段記錄日誌
+	if actualPeriod == "4h" {
+		log.Printf("✅ %s: OI 4h变化 %.3f%% (当前: %.0f, 4h前: %.0f)",
+			symbol, change, latestOI, oiOld)
+	} else {
+		log.Printf("⚠️  %s: OI %s变化 %.3f%% (当前: %.0f, %s前: %.0f) [系统运行时间不足4h，使用降级计算]",
+			symbol, actualPeriod, change, latestOI, actualPeriod, oiOld)
+	}
+
+	return change, actualPeriod
 }
 
 // StartOIMonitoring 启动OI定期监控（每15分钟采样）
@@ -473,6 +515,7 @@ func (m *WSMonitor) StartOIMonitoring() {
 // collectOISnapshots 采集所有交易对的OI快照
 func (m *WSMonitor) collectOISnapshots() {
 	apiClient := NewAPIClient()
+	successCount := 0
 
 	for _, symbol := range m.symbols {
 		// 获取当前OI
@@ -484,7 +527,9 @@ func (m *WSMonitor) collectOISnapshots() {
 
 		// 存储快照
 		m.StoreOISnapshot(symbol, oiData.Latest)
+		successCount++
 	}
 
-	log.Printf("✅ OI快照采集完成（%d个币种）", len(m.symbols))
+	log.Printf("✅ OI快照采集完成（成功: %d/%d，时间: %s）",
+		successCount, len(m.symbols), time.Now().Format("15:04:05"))
 }

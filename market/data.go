@@ -83,7 +83,7 @@ func Get(symbol string) (*Data, error) {
 	oiData, err := getOpenInterestData(symbol)
 	if err != nil {
 		// OI失败不影响整体,使用默认值
-		oiData = &OIData{Latest: 0, Average: 0}
+		oiData = &OIData{Latest: 0, Average: 0, ActualPeriod: "N/A"}
 	}
 
 	// 获取Funding Rate
@@ -440,10 +440,13 @@ func getOpenInterestData(symbol string) (*OIData, error) {
 
 	oi, _ := strconv.ParseFloat(result.OpenInterest, 64)
 
-	// P0修复：计算4小时OI变化率
+	// P0修复：计算4小时OI变化率（返回变化率和实际时间段）
 	var change4h float64
+	var actualPeriod string
 	if WSMonitorCli != nil {
-		change4h = WSMonitorCli.CalculateOIChange4h(symbol, oi)
+		change4h, actualPeriod = WSMonitorCli.CalculateOIChange4h(symbol, oi)
+	} else {
+		actualPeriod = "N/A"
 	}
 
 	// P0修复：获取历史数据
@@ -453,10 +456,11 @@ func getOpenInterestData(symbol string) (*OIData, error) {
 	}
 
 	return &OIData{
-		Latest:     oi,
-		Average:    oi * 0.999, // 近似平均值
-		Change4h:   change4h,   // P0修复：4小时变化率
-		Historical: history,    // P0修复：历史数据
+		Latest:       oi,
+		Average:      oi * 0.999, // 近似平均值
+		Change4h:     change4h,   // P0修复：4小时变化率
+		ActualPeriod: actualPeriod,
+		Historical:   history, // P0修复：历史数据
 	}, nil
 }
 
@@ -506,12 +510,26 @@ func Format(data *Data) string {
 		data.Symbol))
 
 	if data.OpenInterest != nil {
-		// P0修复：输出OI 4小时变化率（用于AI验证"近4小时上升>+3%"）
+		// P0修复：输出OI变化率（用于AI验证"近4小时上升>+3%"）
 		// 使用动态精度格式化 OI 数据
 		oiLatestStr := formatPriceWithDynamicPrecision(data.OpenInterest.Latest)
 		oiAverageStr := formatPriceWithDynamicPrecision(data.OpenInterest.Average)
-		sb.WriteString(fmt.Sprintf("Open Interest: Latest: %s Average: %s Change(4h): %.2f%%\n\n",
-			oiLatestStr, oiAverageStr, data.OpenInterest.Change4h))
+
+		// P0修复：根據實際時間段動態顯示
+		var changeLabel string
+		if data.OpenInterest.ActualPeriod == "N/A" {
+			changeLabel = "Change(4h): N/A (insufficient data, system uptime < 15min)"
+		} else if data.OpenInterest.ActualPeriod == "4h" {
+			// 完整 4 小時數據
+			changeLabel = fmt.Sprintf("Change(4h): %.3f%%", data.OpenInterest.Change4h)
+		} else {
+			// 降級使用較短時間段
+			changeLabel = fmt.Sprintf("Change(4h): %.3f%% [degraded: using %s data, system uptime < 4h]",
+				data.OpenInterest.Change4h, data.OpenInterest.ActualPeriod)
+		}
+
+		sb.WriteString(fmt.Sprintf("Open Interest: Latest: %s Average: %s %s\n\n",
+			oiLatestStr, oiAverageStr, changeLabel))
 	}
 
 	sb.WriteString(fmt.Sprintf("Funding Rate: %.2e\n\n", data.FundingRate))
