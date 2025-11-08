@@ -253,30 +253,13 @@ func (m *WSMonitor) subscribeSymbol(symbol, st string) []string {
 	return streams
 }
 func (m *WSMonitor) subscribeAll() error {
-	// 🚀 优化：并发订阅（提升启动速度 ~70%）
 	log.Println("开始订阅所有交易对...")
-
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 50) // 限制并发数为 50
-
-	startTime := time.Now()
 
 	for _, symbol := range m.symbols {
 		for _, st := range subKlineTime {
-			wg.Add(1)
-			semaphore <- struct{}{} // 获取信号量
-
-			go func(sym, streamTime string) {
-				defer wg.Done()
-				defer func() { <-semaphore }() // 释放信号量
-
-				m.subscribeSymbol(sym, streamTime)
-			}(symbol, st)
+			m.subscribeSymbol(symbol, st)
 		}
 	}
-
-	wg.Wait() // 等待所有订阅完成
-	log.Printf("✅ 并发订阅完成（耗时 %.2f 秒）", time.Since(startTime).Seconds())
 
 	// 执行批量订阅
 	for _, st := range subKlineTime {
