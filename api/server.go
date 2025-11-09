@@ -277,6 +277,8 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		return
 	}
 
+	var err error // Declare err for later use
+
 	// 校验杠杆值
 	if req.BTCETHLeverage < 0 || req.BTCETHLeverage > 50 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "BTC/ETH杠杆必须在1-50倍之间"})
