@@ -360,7 +360,7 @@ func (l *DecisionLogger) AnalyzePerformance(lookbackCycles int) (*PerformanceAna
 				// partial_close 需要根據持倉判斷方向
 				if action.Action == "partial_close" && side == "" {
 					for key, pos := range openPositions {
-						if posSymbol, _ := pos["side"].(string); key == symbol+"_"+posSymbol {
+						if posSymbol, ok := pos["side"].(string); ok && key == symbol+"_"+posSymbol {
 							side = posSymbol
 							break
 						}
@@ -407,7 +407,7 @@ func (l *DecisionLogger) AnalyzePerformance(lookbackCycles int) (*PerformanceAna
 			if action.Action == "partial_close" {
 				// 從 openPositions 中查找持倉方向
 				for key, pos := range openPositions {
-					if posSymbol, _ := pos["side"].(string); key == symbol+"_"+posSymbol {
+					if posSymbol, ok := pos["side"].(string); ok && key == symbol+"_"+posSymbol {
 						side = posSymbol
 						break
 					}

@@ -375,7 +375,10 @@ func (at *AutoTrader) autoSyncBalanceIfNeeded() {
 
 			if !pnlFound {
 				pnlFieldMissing = true
-				posSymbol, _ := pos["symbol"].(string)
+				posSymbol, ok := pos["symbol"].(string)
+				if !ok {
+					posSymbol = "未知"
+				}
 				log.Printf("  ⚠️ [%s] 持仓 %s 缺少未实现盈亏字段", at.name, posSymbol)
 			}
 		}
@@ -1202,9 +1205,18 @@ func (at *AutoTrader) queryHyperliquidStopLossOrder(symbol, positionSide string,
 // checkDualSidePosition 检查是否存在双向持仓（防御性检查）
 func (at *AutoTrader) checkDualSidePosition(symbol, positionSide string, positions []map[string]interface{}) {
 	for _, pos := range positions {
-		posSymbol, _ := pos["symbol"].(string)
-		posSide, _ := pos["side"].(string)
-		posAmt, _ := pos["positionAmt"].(float64)
+		posSymbol, ok := pos["symbol"].(string)
+		if !ok {
+			continue
+		}
+		posSide, ok := pos["side"].(string)
+		if !ok {
+			continue
+		}
+		posAmt, ok := pos["positionAmt"].(float64)
+		if !ok {
+			continue
+		}
 		if posSymbol == symbol && posAmt != 0 && strings.ToUpper(posSide) != positionSide {
 			oppositeSide := strings.ToUpper(posSide)
 			log.Printf("  🚨 警告：检测到 %s 存在双向持仓（%s + %s），这违反了策略规则",
@@ -1274,8 +1286,14 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	// 查找目标持仓
 	var targetPosition map[string]interface{}
 	for _, pos := range positions {
-		symbol, _ := pos["symbol"].(string)
-		posAmt, _ := pos["positionAmt"].(float64)
+		symbol, ok := pos["symbol"].(string)
+		if !ok {
+			continue
+		}
+		posAmt, ok := pos["positionAmt"].(float64)
+		if !ok {
+			continue
+		}
 		if symbol == decision.Symbol && posAmt != 0 {
 			targetPosition = pos
 			break
@@ -1287,9 +1305,16 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	}
 
 	// 获取持仓方向和数量
-	side, _ := targetPosition["side"].(string)
+	side, ok := targetPosition["side"].(string)
+	if !ok || side == "" {
+		return fmt.Errorf("无法解析持仓方向")
+	}
 	positionSide := strings.ToUpper(side)
-	positionAmt, _ := targetPosition["positionAmt"].(float64)
+
+	positionAmt, ok := targetPosition["positionAmt"].(float64)
+	if !ok {
+		return fmt.Errorf("无法解析持仓数量")
+	}
 
 	// 验证新止损价格合理性
 	if positionSide == "LONG" && decision.NewStopLoss >= marketData.CurrentPrice {
@@ -1381,8 +1406,14 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	// 查找目标持仓
 	var targetPosition map[string]interface{}
 	for _, pos := range positions {
-		symbol, _ := pos["symbol"].(string)
-		posAmt, _ := pos["positionAmt"].(float64)
+		symbol, ok := pos["symbol"].(string)
+		if !ok {
+			continue
+		}
+		posAmt, ok := pos["positionAmt"].(float64)
+		if !ok {
+			continue
+		}
 		if symbol == decision.Symbol && posAmt != 0 {
 			targetPosition = pos
 			break
@@ -1394,9 +1425,16 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	}
 
 	// 获取持仓方向和数量
-	side, _ := targetPosition["side"].(string)
+	side, ok := targetPosition["side"].(string)
+	if !ok || side == "" {
+		return fmt.Errorf("无法解析持仓方向")
+	}
 	positionSide := strings.ToUpper(side)
-	positionAmt, _ := targetPosition["positionAmt"].(float64)
+
+	positionAmt, ok := targetPosition["positionAmt"].(float64)
+	if !ok {
+		return fmt.Errorf("无法解析持仓数量")
+	}
 
 	// 验证新止盈价格合理性
 	if positionSide == "LONG" && decision.NewTakeProfit <= marketData.CurrentPrice {
@@ -1461,8 +1499,14 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	// 查找目标持仓
 	var targetPosition map[string]interface{}
 	for _, pos := range positions {
-		symbol, _ := pos["symbol"].(string)
-		posAmt, _ := pos["positionAmt"].(float64)
+		symbol, ok := pos["symbol"].(string)
+		if !ok {
+			continue
+		}
+		posAmt, ok := pos["positionAmt"].(float64)
+		if !ok {
+			continue
+		}
 		if symbol == decision.Symbol && posAmt != 0 {
 			targetPosition = pos
 			break
@@ -1474,9 +1518,16 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	}
 
 	// 获取持仓方向和数量
-	side, _ := targetPosition["side"].(string)
+	side, ok := targetPosition["side"].(string)
+	if !ok || side == "" {
+		return fmt.Errorf("无法解析持仓方向")
+	}
 	positionSide := strings.ToUpper(side)
-	positionAmt, _ := targetPosition["positionAmt"].(float64)
+
+	positionAmt, ok := targetPosition["positionAmt"].(float64)
+	if !ok {
+		return fmt.Errorf("无法解析持仓数量")
+	}
 
 	// 计算平仓数量
 	totalQuantity := math.Abs(positionAmt)
@@ -1484,7 +1535,11 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	actionRecord.Quantity = closeQuantity
 
 	// ✅ Layer 2: 最小仓位检查（防止产生小额剩余）
-	markPrice, _ := targetPosition["markPrice"].(float64)
+	markPrice, ok := targetPosition["markPrice"].(float64)
+	if !ok || markPrice <= 0 {
+		return fmt.Errorf("无法解析当前价格，无法执行最小仓位检查")
+	}
+
 	currentPositionValue := totalQuantity * markPrice
 	remainingQuantity := totalQuantity - closeQuantity
 	remainingValue := remainingQuantity * markPrice

@@ -120,7 +120,10 @@ func (t *AsterTrader) getPrecision(symbol string) (SymbolPrecision, error) {
 
 		// 解析filters获取tickSize和stepSize
 		for _, filter := range s.Filters {
-			filterType, _ := filter["filterType"].(string)
+			filterType, ok := filter["filterType"].(string)
+			if !ok {
+				continue
+			}
 			switch filterType {
 			case "PRICE_FILTER":
 				if tickSizeStr, ok := filter["tickSize"].(string); ok {
@@ -538,11 +541,46 @@ func (t *AsterTrader) GetPositions() ([]map[string]interface{}, error) {
 			continue // 跳过空仓位
 		}
 
-		entryPrice, _ := strconv.ParseFloat(pos["entryPrice"].(string), 64)
-		markPrice, _ := strconv.ParseFloat(pos["markPrice"].(string), 64)
-		unRealizedProfit, _ := strconv.ParseFloat(pos["unRealizedProfit"].(string), 64)
-		leverageVal, _ := strconv.ParseFloat(pos["leverage"].(string), 64)
-		liquidationPrice, _ := strconv.ParseFloat(pos["liquidationPrice"].(string), 64)
+		entryPriceStr, ok := pos["entryPrice"].(string)
+		if !ok {
+			log.Printf("  ⚠️ [%s] 无法解析 entryPrice，跳过此持仓", "Aster")
+			continue
+		}
+		entryPrice, err := strconv.ParseFloat(entryPriceStr, 64)
+		if err != nil {
+			log.Printf("  ⚠️ [%s] entryPrice 格式错误: %v，跳过此持仓", "Aster", err)
+			continue
+		}
+
+		markPriceStr, ok := pos["markPrice"].(string)
+		if !ok {
+			log.Printf("  ⚠️ [%s] 无法解析 markPrice，跳过此持仓", "Aster")
+			continue
+		}
+		markPrice, err := strconv.ParseFloat(markPriceStr, 64)
+		if err != nil {
+			log.Printf("  ⚠️ [%s] markPrice 格式错误: %v，跳过此持仓", "Aster", err)
+			continue
+		}
+
+		// 以下字段允许失败，使用默认值 0
+		unRealizedProfitStr, ok := pos["unRealizedProfit"].(string)
+		unRealizedProfit := 0.0
+		if ok {
+			unRealizedProfit, _ = strconv.ParseFloat(unRealizedProfitStr, 64)
+		}
+
+		leverageStr, ok := pos["leverage"].(string)
+		leverageVal := 0.0
+		if ok {
+			leverageVal, _ = strconv.ParseFloat(leverageStr, 64)
+		}
+
+		liquidationPriceStr, ok := pos["liquidationPrice"].(string)
+		liquidationPrice := 0.0
+		if ok {
+			liquidationPrice, _ = strconv.ParseFloat(liquidationPriceStr, 64)
+		}
 
 		// 判断方向（与Binance一致）
 		side := "long"
@@ -1063,7 +1101,10 @@ func (t *AsterTrader) CancelStopOrders(symbol string) error {
 	// 过滤出止盈止损单并取消
 	canceledCount := 0
 	for _, order := range orders {
-		orderType, _ := order["type"].(string)
+		orderType, ok := order["type"].(string)
+		if !ok {
+			continue
+		}
 
 		// 只取消止损和止盈订单
 		if orderType == "STOP_MARKET" ||
@@ -1071,7 +1112,10 @@ func (t *AsterTrader) CancelStopOrders(symbol string) error {
 			orderType == "STOP" ||
 			orderType == "TAKE_PROFIT" {
 
-			orderID, _ := order["orderId"].(float64)
+			orderID, ok := order["orderId"].(float64)
+			if !ok {
+				continue
+			}
 			cancelParams := map[string]interface{}{
 				"symbol":  symbol,
 				"orderId": int64(orderID),
@@ -1119,12 +1163,21 @@ func (t *AsterTrader) CancelStopLossOrders(symbol string) error {
 	canceledCount := 0
 	var cancelErrors []error
 	for _, order := range orders {
-		orderType, _ := order["type"].(string)
+		orderType, ok := order["type"].(string)
+		if !ok {
+			continue
+		}
 
 		// 只取消止损订单（不取消止盈订单）
 		if orderType == "STOP_MARKET" || orderType == "STOP" {
-			orderID, _ := order["orderId"].(float64)
-			positionSide, _ := order["positionSide"].(string)
+			orderID, ok := order["orderId"].(float64)
+			if !ok {
+				continue
+			}
+			positionSide, ok := order["positionSide"].(string)
+			if !ok {
+				continue
+			}
 			cancelParams := map[string]interface{}{
 				"symbol":  symbol,
 				"orderId": int64(orderID),
@@ -1178,12 +1231,21 @@ func (t *AsterTrader) CancelTakeProfitOrders(symbol string) error {
 	canceledCount := 0
 	var cancelErrors []error
 	for _, order := range orders {
-		orderType, _ := order["type"].(string)
+		orderType, ok := order["type"].(string)
+		if !ok {
+			continue
+		}
 
 		// 只取消止盈订单（不取消止损订单）
 		if orderType == "TAKE_PROFIT_MARKET" || orderType == "TAKE_PROFIT" {
-			orderID, _ := order["orderId"].(float64)
-			positionSide, _ := order["positionSide"].(string)
+			orderID, ok := order["orderId"].(float64)
+			if !ok {
+				continue
+			}
+			positionSide, ok := order["positionSide"].(string)
+			if !ok {
+				continue
+			}
 			cancelParams := map[string]interface{}{
 				"symbol":  symbol,
 				"orderId": int64(orderID),
