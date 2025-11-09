@@ -1330,13 +1330,22 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	// ============ P1 修复：保本价硬约束（防止过早移动止损） ============
 	entryPrice := targetPosition["entryPrice"].(float64)
 
-	// 🔍 Step 1: 计算当前利润百分比（基于价格变化）
-	var profitPercent float64
-	if positionSide == "LONG" {
-		profitPercent = (marketData.CurrentPrice - entryPrice) / entryPrice * 100
-	} else { // SHORT
-		profitPercent = (entryPrice - marketData.CurrentPrice) / entryPrice * 100
+	// 🔍 获取杠杆倍数（用于计算真实盈利）
+	leverage := 10 // 默认值
+	if lev, ok := targetPosition["leverage"].(float64); ok {
+		leverage = int(lev)
 	}
+
+	// 🔍 Step 1: 计算当前利润百分比（基于价格变化 × 杠杆）
+	var priceChangePercent float64
+	if positionSide == "LONG" {
+		priceChangePercent = (marketData.CurrentPrice - entryPrice) / entryPrice * 100
+	} else { // SHORT
+		priceChangePercent = (entryPrice - marketData.CurrentPrice) / entryPrice * 100
+	}
+
+	// ✅ 修复：真实盈利 = 价格变化 × 杠杆倍数
+	profitPercent := priceChangePercent * float64(leverage)
 
 	// 🔍 Step 2: 判断新止损价是否接近保本价（±0.5%）
 	distanceToEntry := math.Abs(decision.NewStopLoss-entryPrice) / entryPrice
@@ -1345,18 +1354,21 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	// 🔍 Step 3: 如果利润不足 3% 且尝试设置保本价，拒绝执行
 	if profitPercent < 3.0 && isBreakevenStopLoss {
 		log.Printf("  🚫 拒绝调整止损：当前利润仅 %.2f%%，未达到 3%% 最低要求", profitPercent)
-		log.Printf("  📊 入场价: %.4f | 当前价: %.4f | 尝试设置止损: %.4f (距离入场价 %.2f%%)",
-			entryPrice, marketData.CurrentPrice, decision.NewStopLoss, distanceToEntry*100)
+		log.Printf("  📊 入场价: %.4f | 当前价: %.4f | 价格变化: %.2f%% | %dx杠杆 → 真实盈利: %.2f%%",
+			entryPrice, marketData.CurrentPrice, priceChangePercent, leverage, profitPercent)
+		log.Printf("  📊 尝试设置止损: %.4f (距离入场价 %.2f%%)",
+			decision.NewStopLoss, distanceToEntry*100)
 		log.Printf("  💡 建议：等待利润达到 3%% 以上后再移动止损至保本价")
 		return fmt.Errorf("利润不足 3%% (当前 %.2f%%)，不允许移动止损至保本价", profitPercent)
 	}
 
 	// 📊 记录当前利润状态（通过检查时）
 	if isBreakevenStopLoss {
-		log.Printf("  ✅ 保本价检查通过：当前利润 %.2f%% ≥ 3%%，允许移动止损至保本价", profitPercent)
+		log.Printf("  ✅ 保本价检查通过：价格变化 %.2f%% × %dx杠杆 = 真实盈利 %.2f%% ≥ 3%%，允许移动止损至保本价",
+			priceChangePercent, leverage, profitPercent)
 	} else {
-		log.Printf("  📊 当前利润: %.2f%% | 入场价: %.4f | 新止损: %.4f (距离入场价 %.2f%%)",
-			profitPercent, entryPrice, decision.NewStopLoss, distanceToEntry*100)
+		log.Printf("  📊 价格变化: %.2f%% × %dx杠杆 = 真实盈利: %.2f%% | 新止损: %.4f (距离入场价 %.2f%%)",
+			priceChangePercent, leverage, profitPercent, decision.NewStopLoss, distanceToEntry*100)
 	}
 	// ===================================================
 
