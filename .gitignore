@@ -29,12 +29,18 @@ Thumbs.db
 # 环境变量
 .env
 config.json
-config.db
+config.db*
+nofx.db
+configbak.json
+
+# ESLint 临时报告文件（调试时生成，不纳入版本控制）
+eslint-*.json
+
+# VS code
+.vscode
 
 # 加密密钥 (CRITICAL: 绝不提交!)
 .secrets/
-*.key
-*.pem
 crypto/.secrets/
 
 # 数据库备份
