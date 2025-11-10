@@ -135,8 +135,10 @@ export function TraderConfigModal({
     fetchConfig()
   }, [])
 
-  // 获取系统提示词模板列表
+  // 获取系统提示词模板列表（修复 #643：每次打开 Modal 时刷新）
   useEffect(() => {
+    if (!isOpen) return // Modal 未打开时不执行
+
     const fetchPromptTemplates = async () => {
       try {
         const response = await fetch('/api/prompt-templates')
@@ -151,7 +153,7 @@ export function TraderConfigModal({
       }
     }
     fetchPromptTemplates()
-  }, [])
+  }, [isOpen]) // 依赖 isOpen，每次打开 Modal 时都会重新获取
 
   if (!isOpen) return null
 
