@@ -73,7 +73,13 @@ export function TraderConfigModal({
   const [availableCoins, setAvailableCoins] = useState<string[]>([])
   const [selectedCoins, setSelectedCoins] = useState<string[]>([])
   const [showCoinSelector, setShowCoinSelector] = useState(false)
-  const [promptTemplates, setPromptTemplates] = useState<{ name: string }[]>([])
+  const [promptTemplates, setPromptTemplates] = useState<
+    {
+      name: string
+      display_name?: { zh: string; en: string }
+      description?: { zh: string; en: string }
+    }[]
+  >([])
   const [isFetchingBalance, setIsFetchingBalance] = useState(false)
   const [balanceFetchError, setBalanceFetchError] = useState<string>('')
 
@@ -700,74 +706,57 @@ export function TraderConfigModal({
                   className="w-full px-3 py-2 bg-[#0B0E11] border border-[#2B3139] rounded text-[#EAECEF] focus:border-[#F0B90B] focus:outline-none"
                 >
                   {promptTemplates.map((template) => {
-                    // Template name mapping with i18n
-                    const getTemplateName = (name: string) => {
-                      const keyMap: Record<string, string> = {
-                        default: 'promptTemplateDefault',
-                        adaptive: 'promptTemplateAdaptive',
-                        adaptive_relaxed: 'promptTemplateAdaptiveRelaxed',
-                        Hansen: 'promptTemplateHansen',
-                        nof1: 'promptTemplateNof1',
-                        taro_long_prompts: 'promptTemplateTaroLong',
-                      }
-                      const key = keyMap[name]
-                      return key
-                        ? t(key, language)
-                        : name.charAt(0).toUpperCase() + name.slice(1)
-                    }
+                    // 使用 API 返回的 display_name，如果沒有則使用模板名稱
+                    const displayName =
+                      template.display_name?.[language] ||
+                      template.display_name?.['zh'] ||
+                      template.name
 
                     return (
                       <option key={template.name} value={template.name}>
-                        {getTemplateName(template.name)}
+                        {displayName}
                       </option>
                     )
                   })}
                 </select>
 
                 {/* 動態描述區域 */}
-                <div
-                  className="mt-2 p-3 rounded"
-                  style={{
-                    background: 'rgba(240, 185, 11, 0.05)',
-                    border: '1px solid rgba(240, 185, 11, 0.15)',
-                  }}
-                >
-                  <div
-                    className="text-xs font-semibold mb-1"
-                    style={{ color: '#F0B90B' }}
-                  >
-                    {(() => {
-                      const titleKeyMap: Record<string, string> = {
-                        default: 'promptDescDefault',
-                        adaptive: 'promptDescAdaptive',
-                        adaptive_relaxed: 'promptDescAdaptiveRelaxed',
-                        Hansen: 'promptDescHansen',
-                        nof1: 'promptDescNof1',
-                        taro_long_prompts: 'promptDescTaroLong',
-                      }
-                      const key = titleKeyMap[formData.system_prompt_template]
-                      return key
-                        ? t(key, language)
-                        : t('promptDescDefault', language)
-                    })()}
-                  </div>
-                  <div className="text-xs" style={{ color: '#848E9C' }}>
-                    {(() => {
-                      const contentKeyMap: Record<string, string> = {
-                        default: 'promptDescDefaultContent',
-                        adaptive: 'promptDescAdaptiveContent',
-                        adaptive_relaxed: 'promptDescAdaptiveRelaxedContent',
-                        Hansen: 'promptDescHansenContent',
-                        nof1: 'promptDescNof1Content',
-                        taro_long_prompts: 'promptDescTaroLongContent',
-                      }
-                      const key = contentKeyMap[formData.system_prompt_template]
-                      return key
-                        ? t(key, language)
-                        : t('promptDescDefaultContent', language)
-                    })()}
-                  </div>
-                </div>
+                {(() => {
+                  const selectedTemplate = promptTemplates.find(
+                    (t) => t.name === formData.system_prompt_template
+                  )
+                  const displayName =
+                    selectedTemplate?.display_name?.[language] ||
+                    selectedTemplate?.display_name?.['zh'] ||
+                    formData.system_prompt_template
+                  const description =
+                    selectedTemplate?.description?.[language] ||
+                    selectedTemplate?.description?.['zh'] ||
+                    ''
+
+                  // 只在有描述時顯示
+                  if (!description) return null
+
+                  return (
+                    <div
+                      className="mt-2 p-3 rounded"
+                      style={{
+                        background: 'rgba(240, 185, 11, 0.05)',
+                        border: '1px solid rgba(240, 185, 11, 0.15)',
+                      }}
+                    >
+                      <div
+                        className="text-xs font-semibold mb-1"
+                        style={{ color: '#F0B90B' }}
+                      >
+                        📊 {displayName}
+                      </div>
+                      <div className="text-xs" style={{ color: '#848E9C' }}>
+                        {description}
+                      </div>
+                    </div>
+                  )
+                })()}
                 <p className="text-xs text-[#848E9C] mt-1">
                   选择预设的交易策略模板（包含交易哲学、风控原则等）
                 </p>

@@ -360,12 +360,30 @@ Open your browser and visit: **http://localhost:3000**
 4. **Start Trading**: Launch your configured traders
 
 #### Manage Your System
+
+**Daily Operations:**
 ```bash
 ./start.sh logs      # View logs
 ./start.sh status    # Check status
 ./start.sh stop      # Stop services
-./start.sh restart   # Restart services
+./start.sh restart   # Quick restart (containers only)
 ```
+
+**After Code Changes:**
+```bash
+./start.sh start --build   # Rebuild and restart (required for code changes)
+```
+
+**When to use `start --build`:**
+- ✅ After modifying Go backend code (*.go files)
+- ✅ After modifying React frontend code (web/src/**/*.tsx, *.ts)
+- ✅ After changing Dockerfile or docker-compose.yml
+- ✅ After pulling latest code from git
+
+**When `restart` is enough:**
+- ✅ After changing config.json or .env (configuration only)
+- ✅ To recover from container crashes
+- ✅ For routine restarts
 
 **📖 For detailed Docker deployment guide, troubleshooting, and advanced configuration:**
 - **English**: See [docs/getting-started/docker-deploy.en.md](docs/getting-started/docker-deploy.en.md)

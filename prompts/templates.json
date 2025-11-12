@@ -1,0 +1,81 @@
+{
+  "templates": {
+    "default": {
+      "name": {
+        "zh": "默认稳健策略",
+        "en": "Default Stable Strategy"
+      },
+      "description": {
+        "zh": "最大化夏普比率，平衡风险收益，适合新手和长期稳定交易",
+        "en": "Maximize Sharpe Ratio, balanced risk-reward, suitable for beginners and long-term stable trading"
+      },
+      "file": "default.txt"
+    },
+    "BTC-Range-Ladder": {
+      "name": {
+        "zh": "BTC 区间阶梯策略",
+        "en": "BTC Range Ladder Strategy"
+      },
+      "description": {
+        "zh": "专注于 BTC 区间交易的阶梯式策略",
+        "en": "Ladder strategy focused on BTC range trading"
+      },
+      "file": "BTC-Range-Ladder.txt"
+    },
+    "Hansen": {
+      "name": {
+        "zh": "Hansen 稳健策略",
+        "en": "Hansen Conservative Strategy"
+      },
+      "description": {
+        "zh": "强调资金保全和风险控制，严格执行纪律，适合保守型交易者",
+        "en": "Emphasizes capital preservation and risk control, strict discipline execution, suitable for conservative traders"
+      },
+      "file": "Hansen.txt"
+    },
+    "adaptive": {
+      "name": {
+        "zh": "自适应保守策略",
+        "en": "Adaptive Conservative Strategy"
+      },
+      "description": {
+        "zh": "根据市场条件动态调整，偏保守风格",
+        "en": "Dynamically adjusts to market conditions, conservative style"
+      },
+      "file": "adaptive.txt"
+    },
+    "adaptive_relaxed": {
+      "name": {
+        "zh": "自适应激进策略",
+        "en": "Adaptive Aggressive Strategy"
+      },
+      "description": {
+        "zh": "更激进的交易风格，追求更高收益",
+        "en": "More aggressive trading style, pursuing higher returns"
+      },
+      "file": "adaptive_relaxed.txt"
+    },
+    "nof1": {
+      "name": {
+        "zh": "NoF1 英文框架",
+        "en": "NoF1 English Framework"
+      },
+      "description": {
+        "zh": "使用英文提示词的专业框架",
+        "en": "Professional framework using English prompts"
+      },
+      "file": "nof1.txt"
+    },
+    "taro_long_prompts": {
+      "name": {
+        "zh": "Taro 长仓策略",
+        "en": "Taro Long Position Strategy"
+      },
+      "description": {
+        "zh": "专注于做多机会的策略",
+        "en": "Strategy focused on long position opportunities"
+      },
+      "file": "taro_long_prompts.txt"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package decision
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -11,8 +12,17 @@ import (
 
 // PromptTemplate 系统提示词模板
 type PromptTemplate struct {
-	Name    string // 模板名称（文件名，不含扩展名）
-	Content string // 模板内容
+	Name        string            // 模板名称（文件名，不含扩展名）
+	Content     string            // 模板内容
+	DisplayName map[string]string // 显示名称（多语言）{"zh": "中文名", "en": "English Name"}
+	Description map[string]string // 描述（多语言）
+}
+
+// TemplateMetadata 模板元数据配置
+type TemplateMetadata struct {
+	Name        map[string]string `json:"name"`
+	Description map[string]string `json:"description"`
+	File        string            `json:"file"`
 }
 
 // PromptManager 提示词管理器
@@ -55,6 +65,21 @@ func (pm *PromptManager) LoadTemplates(dir string) error {
 		return fmt.Errorf("提示词目录不存在: %s", dir)
 	}
 
+	// 尝试加载 templates.json 配置文件
+	metadataMap := make(map[string]*TemplateMetadata)
+	configPath := filepath.Join(dir, "templates.json")
+	if configData, err := os.ReadFile(configPath); err == nil {
+		var config struct {
+			Templates map[string]*TemplateMetadata `json:"templates"`
+		}
+		if err := json.Unmarshal(configData, &config); err == nil {
+			metadataMap = config.Templates
+			log.Printf("  ✓ 已加载提示词配置文件: templates.json")
+		} else {
+			log.Printf("  ⚠️  解析 templates.json 失败: %v", err)
+		}
+	}
+
 	// 扫描目录中的所有 .txt 文件
 	files, err := filepath.Glob(filepath.Join(dir, "*.txt"))
 	if err != nil {
@@ -79,11 +104,30 @@ func (pm *PromptManager) LoadTemplates(dir string) error {
 		fileName := filepath.Base(file)
 		templateName := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
-		// 存储模板
-		pm.templates[templateName] = &PromptTemplate{
+		// 创建模板对象
+		template := &PromptTemplate{
 			Name:    templateName,
 			Content: string(content),
 		}
+
+		// 如果有配置元数据，填充显示名称和描述
+		if metadata, exists := metadataMap[templateName]; exists {
+			template.DisplayName = metadata.Name
+			template.Description = metadata.Description
+		} else {
+			// 如果没有配置，使用模板名称作为默认显示名称
+			template.DisplayName = map[string]string{
+				"zh": templateName,
+				"en": templateName,
+			}
+			template.Description = map[string]string{
+				"zh": "",
+				"en": "",
+			}
+		}
+
+		// 存储模板
+		pm.templates[templateName] = template
 
 		log.Printf("  📄 加载提示词模板: %s (%s)", templateName, fileName)
 	}

@@ -301,6 +301,7 @@ export const translations = {
     promptTemplateHansen: 'Hansen Strategy',
     promptTemplateNof1: 'NoF1 English Framework',
     promptTemplateTaroLong: 'Taro Long Position',
+    promptTemplateBTCRangeLadder: 'BTC Range Ladder',
     promptDescDefault: '📊 Default Stable Strategy',
     promptDescDefaultContent:
       'Maximize Sharpe ratio, balanced risk-reward, suitable for beginners and stable long-term trading',
@@ -319,6 +320,9 @@ export const translations = {
     promptDescTaroLong: '📈 Taro Long Position Strategy',
     promptDescTaroLongContent:
       'Data-driven decisions, multi-dimensional validation, continuous learning evolution, long position specialist',
+    promptDescBTCRangeLadder: '📈 BTC Multi-Timeframe Range Strategy',
+    promptDescBTCRangeLadderContent:
+      'BTC priority, multi-timeframe (4h/1h/15m) analysis, range trading, ladder TP/SL, requires 4h/1h/15m data',
 
     // Loading & Error
     loading: 'Loading...',
@@ -1137,6 +1141,7 @@ export const translations = {
     promptTemplateHansen: 'Hansen 策略',
     promptTemplateNof1: 'NoF1 英文框架',
     promptTemplateTaroLong: 'Taro 长仓',
+    promptTemplateBTCRangeLadder: 'BTC区间阶梯',
     promptDescDefault: '📊 默认稳健策略',
     promptDescDefaultContent:
       '最大化夏普比率，平衡风险收益，适合新手和长期稳定交易',
@@ -1154,6 +1159,9 @@ export const translations = {
     promptDescTaroLong: '📈 Taro 长仓策略',
     promptDescTaroLongContent:
       '数据驱动决策，多维度验证，持续学习进化，长仓专用',
+    promptDescBTCRangeLadder: '📈 BTC多周期区间策略',
+    promptDescBTCRangeLadderContent:
+      'BTC优先，多周期(4h/1h/15m)分析，震荡区间交易，阶梯止盈，需4小时/1小时/15分钟数据',
 
     // Loading & Error
     loading: '加载中...',

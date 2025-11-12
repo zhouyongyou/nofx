@@ -2219,7 +2219,9 @@ func (s *Server) handleGetPromptTemplates(c *gin.Context) {
 	response := make([]map[string]interface{}, 0, len(templates))
 	for _, tmpl := range templates {
 		response = append(response, map[string]interface{}{
-			"name": tmpl.Name,
+			"name":         tmpl.Name,
+			"display_name": tmpl.DisplayName,
+			"description":  tmpl.Description,
 		})
 	}
 

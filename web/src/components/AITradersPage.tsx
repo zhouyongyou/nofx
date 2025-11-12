@@ -59,22 +59,6 @@ function getShortName(fullName: string): string {
   return parts.length > 1 ? parts[parts.length - 1] : fullName
 }
 
-// 获取策略模板翻译 key
-function getStrategyTemplateKey(template: string | undefined): string {
-  if (!template) return 'promptTemplateDefault'
-
-  const keyMap: Record<string, string> = {
-    default: 'promptTemplateDefault',
-    adaptive: 'promptTemplateAdaptive',
-    adaptive_relaxed: 'promptTemplateAdaptiveRelaxed',
-    Hansen: 'promptTemplateHansen',
-    nof1: 'promptTemplateNof1',
-    taro_long_prompts: 'promptTemplateTaroLong',
-  }
-
-  return keyMap[template] || 'promptTemplateDefault'
-}
-
 interface AITradersPageProps {
   onTraderSelect?: (traderId: string) => void
 }
@@ -93,6 +77,13 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
   const [editingTrader, setEditingTrader] = useState<any>(null)
   const [supportedModels, setSupportedModels] = useState<AIModel[]>([])
   const [supportedExchanges, setSupportedExchanges] = useState<Exchange[]>([])
+  const [promptTemplates, setPromptTemplates] = useState<
+    {
+      name: string
+      display_name?: { zh: string; en: string }
+      description?: { zh: string; en: string }
+    }[]
+  >([])
   const [userSignalSource, setUserSignalSource] = useState<{
     coinPoolUrl: string
     oiTopUrl: string
@@ -100,6 +91,18 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
     coinPoolUrl: '',
     oiTopUrl: '',
   })
+
+  // 獲取策略顯示名稱
+  const getStrategyDisplayName = (templateName: string | undefined): string => {
+    if (!templateName) return 'Default'
+
+    const template = promptTemplates.find((t) => t.name === templateName)
+    return (
+      template?.display_name?.[language] ||
+      template?.display_name?.['zh'] ||
+      templateName
+    )
+  }
 
   const { data: traders, mutate: mutateTraders } = useSWR<TraderInfo[]>(
     user && token ? 'traders' : null,
@@ -132,6 +135,22 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       }
     }
     loadSupportedConfigs()
+  }, [])
+
+  // 获取提示词模板列表
+  useEffect(() => {
+    const fetchPromptTemplates = async () => {
+      try {
+        const response = await fetch('/api/prompt-templates')
+        const data = await response.json()
+        if (data.templates) {
+          setPromptTemplates(data.templates)
+        }
+      } catch (error) {
+        console.error('Failed to fetch prompt templates:', error)
+      }
+    }
+    fetchPromptTemplates()
   }, [])
 
   // 加载用户信号源配置
@@ -1072,10 +1091,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
                         style={{ color: '#848E9C' }}
                       >
                         {t('strategy', language)}:{' '}
-                        {t(
-                          getStrategyTemplateKey(trader.system_prompt_template),
-                          language
-                        )}
+                        {getStrategyDisplayName(trader.system_prompt_template)}
                       </div>
                     )}
                   </div>
