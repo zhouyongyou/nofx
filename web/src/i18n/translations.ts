@@ -821,12 +821,13 @@ export const translations = {
     twoStageKey: {
       title: 'Two-Stage Private Key Input',
       stage1Description:
-        'Enter the first {length} characters of your private key',
+        'Enter the first {length} hex characters of your private key',
       stage2Description:
-        'Enter the remaining {length} characters of your private key',
+        'Enter the remaining {length} hex characters of your private key',
       stage1InputLabel: 'First Part',
       stage2InputLabel: 'Second Part',
       characters: 'characters',
+      helpText: '💡 Accepts {length} hex characters with or without "0x" prefix',
       processing: 'Processing...',
       nextButton: 'Next',
       cancelButton: 'Cancel',
@@ -1612,11 +1613,12 @@ export const translations = {
     // Two-Stage Key Modal
     twoStageKey: {
       title: '两阶段私钥输入',
-      stage1Description: '请输入私钥的前 {length} 位字符',
-      stage2Description: '请输入私钥的后 {length} 位字符',
+      stage1Description: '请输入私钥的前 {length} 位十六进制字符',
+      stage2Description: '请输入私钥的后 {length} 位十六进制字符',
       stage1InputLabel: '第一部分',
       stage2InputLabel: '第二部分',
       characters: '位字符',
+      helpText: '💡 可包含或省略 "0x" 前綴（{length} 位 hex 字符）',
       processing: '处理中...',
       nextButton: '下一步',
       cancelButton: '取消',
