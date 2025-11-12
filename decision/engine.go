@@ -355,6 +355,14 @@ func buildSystemPrompt(accountEquity float64, btcEthLeverage, altcoinLeverage in
 	sb.WriteString(btcEthHint)
 	sb.WriteString("\n\n")
 
+	// ⚠️ 重要提醒：防止 AI 误读市场数据中的数字
+	sb.WriteString("⚠️ **重要提醒：计算 position_size_usd 的正确方法**\n\n")
+	sb.WriteString(fmt.Sprintf("- 当前账户净值：**%.2f USDT**\n", accountEquity))
+	sb.WriteString(fmt.Sprintf("- 山寨币开仓范围：**%.0f - %.0f USDT** (净值的 0.8-1.5 倍)\n", accountEquity*0.8, accountEquity*1.5))
+	sb.WriteString(fmt.Sprintf("- BTC/ETH开仓范围：**%.0f - %.0f USDT** (净值的 5-10 倍)\n", accountEquity*5, accountEquity*10))
+	sb.WriteString("- ❌ **不要使用市场数据中的任何数字**（如 Open Interest 合约数、Volume、价格等）作为 position_size_usd\n")
+	sb.WriteString("- ✅ **position_size_usd 必须根据账户净值和上述范围计算**\n\n")
+
 	// 3. 输出格式 - 动态生成
 	sb.WriteString("# 输出格式 (严格遵守)\n\n")
 	sb.WriteString("**必须使用XML标签 <reasoning> 和 <decision> 标签分隔思维链和决策JSON，避免解析错误**\n\n")

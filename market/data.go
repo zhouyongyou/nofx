@@ -583,9 +583,9 @@ func Format(data *Data) string {
 
 	if data.OpenInterest != nil {
 		// P0修复：输出OI变化率（用于AI验证"近4小时上升>+3%"）
-		// 使用动态精度格式化 OI 数据
-		oiLatestStr := formatPriceWithDynamicPrecision(data.OpenInterest.Latest)
-		oiAverageStr := formatPriceWithDynamicPrecision(data.OpenInterest.Average)
+		// 简化版：只添加单位标注，避免 AI 误读合约数量为开仓金额
+		oiLatestStr := fmt.Sprintf("%.0f contracts", data.OpenInterest.Latest)
+		oiAverageStr := fmt.Sprintf("%.0f contracts", data.OpenInterest.Average)
 
 		// P0修复：根據實際時間段動態顯示
 		var changeLabel string
@@ -603,7 +603,7 @@ func Format(data *Data) string {
 				data.OpenInterest.Change4h, data.OpenInterest.ActualPeriod)
 		}
 
-		sb.WriteString(fmt.Sprintf("Open Interest: Latest: %s Average: %s %s\n\n",
+		sb.WriteString(fmt.Sprintf("Open Interest: Latest: %s | Average: %s | %s\n\n",
 			oiLatestStr, oiAverageStr, changeLabel))
 	}
 
@@ -633,7 +633,7 @@ func Format(data *Data) string {
 		}
 
 		if len(data.IntradaySeries.Volume) > 0 {
-			sb.WriteString(fmt.Sprintf("Volume: %s\n\n", formatFloatSlice(data.IntradaySeries.Volume)))
+			sb.WriteString(fmt.Sprintf("3m Trading Volume (USDT, reference only): %s\n\n", formatFloatSlice(data.IntradaySeries.Volume)))
 		}
 
 		sb.WriteString(fmt.Sprintf("3m ATR (14‑period): %.3f\n\n", data.IntradaySeries.ATR14))
