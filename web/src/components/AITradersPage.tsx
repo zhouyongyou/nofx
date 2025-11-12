@@ -2452,6 +2452,20 @@ function ExchangeConfigModal({
                           >
                             {t('hyperliquidAgentWalletDesc', language)}
                           </div>
+                          <div className="mt-3">
+                            <a
+                              href="https://app.hyperliquid.xyz/API"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded text-sm font-semibold transition-all hover:scale-105"
+                              style={{
+                                background: 'rgba(240, 185, 11, 0.2)',
+                                color: '#F0B90B',
+                              }}
+                            >
+                              🔑 {t('goToAPIManagement', language)}
+                            </a>
+                          </div>
                         </div>
                       </div>
                     </div>
