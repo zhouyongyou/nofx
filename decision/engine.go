@@ -721,34 +721,67 @@ func findMatchingBracket(s string, start int) int {
 	return -1
 }
 
+// positionSizeConfig 定义账户规模分层配置
+type positionSizeConfig struct {
+	MinEquity float64 // 账户最小净值阈值
+	MinSize   float64 // 最小开仓金额（0 表示使用线性插值）
+	MaxSize   float64 // 最大开仓金额（用于线性插值）
+}
+
+var (
+	// 配置常量
+	absoluteMinimum = 12.0 // 交易所绝对最小值 (10 USDT + 20% 安全边际)
+	standardBTCETH  = 60.0 // 标准 BTC/ETH 最小值 (因价格高和精度限制)
+
+	// BTC/ETH 动态调整规则（按账户规模分层）
+	btcEthSizeRules = []positionSizeConfig{
+		{MinEquity: 0, MinSize: absoluteMinimum, MaxSize: absoluteMinimum}, // 小账户(<20U): 12 USDT
+		{MinEquity: 20, MinSize: absoluteMinimum, MaxSize: standardBTCETH}, // 中型账户(20-100U): 线性插值
+		{MinEquity: 100, MinSize: standardBTCETH, MaxSize: standardBTCETH}, // 大账户(≥100U): 60 USDT
+	}
+
+	// 山寨币规则（始终使用绝对最小值）
+	altcoinSizeRules = []positionSizeConfig{
+		{MinEquity: 0, MinSize: absoluteMinimum, MaxSize: absoluteMinimum},
+	}
+
+	// 币种规则映射表（易于扩展，添加新币种只需在此添加一行）
+	symbolSizeRules = map[string][]positionSizeConfig{
+		"BTCUSDT": btcEthSizeRules,
+		"ETHUSDT": btcEthSizeRules,
+		// 未来可添加更多币种的特殊规则，例如:
+		// "BNBUSDT": bnbSizeRules,
+		// "SOLUSDT": solSizeRules,
+	}
+)
+
 // calculateMinPositionSize 根据账户净值和币种动态计算最小开仓金额
 func calculateMinPositionSize(symbol string, accountEquity float64) float64 {
-	const (
-		absoluteMinimum = 12.0 // 交易所绝对最小值 (10 USDT + 20% 安全边际)
-		standardBTCETH  = 60.0 // 标准 BTC/ETH 最小值 (因价格高和精度限制)
-	)
-
-	isBTCETH := symbol == "BTCUSDT" || symbol == "ETHUSDT"
-
-	// 山寨币始终使用绝对最小值
-	if !isBTCETH {
-		return absoluteMinimum
+	// 从配置映射表中获取币种规则
+	rules, exists := symbolSizeRules[symbol]
+	if !exists {
+		// 未配置的币种使用山寨币规则（默认绝对最小值）
+		rules = altcoinSizeRules
 	}
 
-	// BTC/ETH 动态调整策略
-	// 小账户(<20U): 使用绝对最小值，避免完全无法交易
-	if accountEquity < 20.0 {
-		return absoluteMinimum
+	// 根据规则表动态计算
+	for i, rule := range rules {
+		// 找到账户所属的规模区间
+		if i == len(rules)-1 || accountEquity < rules[i+1].MinEquity {
+			// 如果 MinSize == MaxSize，直接返回固定值
+			if rule.MinSize == rule.MaxSize {
+				return rule.MinSize
+			}
+			// 否则使用线性插值
+			nextRule := rules[i+1]
+			equityRange := nextRule.MinEquity - rule.MinEquity
+			sizeRange := rule.MaxSize - rule.MinSize
+			return rule.MinSize + sizeRange*(accountEquity-rule.MinEquity)/equityRange
+		}
 	}
 
-	// 中型账户(20-100U): 线性插值，平滑过渡
-	// 例: 20U账户→12U, 60U账户→36U, 100U账户→60U
-	if accountEquity < 100.0 {
-		return absoluteMinimum + (standardBTCETH-absoluteMinimum)*(accountEquity-20.0)/80.0
-	}
-
-	// 大账户(≥100U): 使用标准值
-	return standardBTCETH
+	// 默认返回绝对最小值（理论上不会执行到这里）
+	return absoluteMinimum
 }
 
 // validateDecision 验证单个决策的有效性
