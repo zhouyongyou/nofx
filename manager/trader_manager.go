@@ -212,6 +212,24 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
 	}
 
+	// 向后兼容：为旧数据设置默认值
+	takerFeeRate := traderCfg.TakerFeeRate
+	if takerFeeRate == 0 {
+		takerFeeRate = 0.0004 // 默认 0.04%
+	}
+	makerFeeRate := traderCfg.MakerFeeRate
+	if makerFeeRate == 0 {
+		makerFeeRate = 0.0002 // 默认 0.02%
+	}
+	enableSmartFallback := traderCfg.EnableSmartFallback
+	if !traderCfg.EnableSmartFallback && traderCfg.MinLeverage == 0 {
+		enableSmartFallback = true // 旧数据默认启用
+	}
+	minLeverage := traderCfg.MinLeverage
+	if minLeverage == 0 {
+		minLeverage = 1 // 默认最低1x
+	}
+
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
 		ID:                    traderCfg.ID,
@@ -239,6 +257,10 @@ func (tm *TraderManager) addTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		DefaultCoins:          defaultCoins,
 		TradingCoins:          tradingCoins,
 		SystemPromptTemplate:  traderCfg.SystemPromptTemplate, // 系统提示词模板
+		TakerFeeRate:          takerFeeRate,                   // Taker 费率
+		MakerFeeRate:          makerFeeRate,                   // Maker 费率
+		EnableSmartFallback:   enableSmartFallback,            // Smart Fallback 配置
+		MinLeverage:           minLeverage,                    // 最低杠杆
 	}
 
 	// 根据交易所类型设置API密钥
@@ -319,6 +341,24 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
 	}
 
+	// 向后兼容：为旧数据设置默认值
+	takerFeeRate := traderCfg.TakerFeeRate
+	if takerFeeRate == 0 {
+		takerFeeRate = 0.0004 // 默认 0.04%
+	}
+	makerFeeRate := traderCfg.MakerFeeRate
+	if makerFeeRate == 0 {
+		makerFeeRate = 0.0002 // 默认 0.02%
+	}
+	enableSmartFallback := traderCfg.EnableSmartFallback
+	if !traderCfg.EnableSmartFallback && traderCfg.MinLeverage == 0 {
+		enableSmartFallback = true // 旧数据默认启用
+	}
+	minLeverage := traderCfg.MinLeverage
+	if minLeverage == 0 {
+		minLeverage = 1 // 默认最低1x
+	}
+
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
 		ID:                    traderCfg.ID,
@@ -345,6 +385,10 @@ func (tm *TraderManager) AddTraderFromDB(traderCfg *config.TraderRecord, aiModel
 		IsCrossMargin:         traderCfg.IsCrossMargin,
 		DefaultCoins:          defaultCoins,
 		TradingCoins:          tradingCoins,
+		TakerFeeRate:          takerFeeRate,        // Taker 费率
+		MakerFeeRate:          makerFeeRate,        // Maker 费率
+		EnableSmartFallback:   enableSmartFallback, // Smart Fallback 配置
+		MinLeverage:           minLeverage,         // 最低杠杆
 	}
 
 	// 根据交易所类型设置API密钥
@@ -1021,6 +1065,24 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 		log.Printf("✓ 交易员 %s 启用 COIN POOL 信号源: %s", traderCfg.Name, coinPoolURL)
 	}
 
+	// 向后兼容：为旧数据设置默认值
+	takerFeeRate := traderCfg.TakerFeeRate
+	if takerFeeRate == 0 {
+		takerFeeRate = 0.0004 // 默认 0.04%
+	}
+	makerFeeRate := traderCfg.MakerFeeRate
+	if makerFeeRate == 0 {
+		makerFeeRate = 0.0002 // 默认 0.02%
+	}
+	enableSmartFallback := traderCfg.EnableSmartFallback
+	if !traderCfg.EnableSmartFallback && traderCfg.MinLeverage == 0 {
+		enableSmartFallback = true // 旧数据默认启用
+	}
+	minLeverage := traderCfg.MinLeverage
+	if minLeverage == 0 {
+		minLeverage = 1 // 默认最低1x
+	}
+
 	// 构建AutoTraderConfig
 	traderConfig := trader.AutoTraderConfig{
 		ID:                   traderCfg.ID,
@@ -1043,6 +1105,10 @@ func (tm *TraderManager) loadSingleTrader(traderCfg *config.TraderRecord, aiMode
 		TradingCoins:         tradingCoins,
 		SystemPromptTemplate: traderCfg.SystemPromptTemplate, // 系统提示词模板
 		HyperliquidTestnet:   exchangeCfg.Testnet,            // Hyperliquid测试网
+		TakerFeeRate:         takerFeeRate,                   // Taker 费率
+		MakerFeeRate:         makerFeeRate,                   // Maker 费率
+		EnableSmartFallback:  enableSmartFallback,            // Smart Fallback 配置
+		MinLeverage:          minLeverage,                    // 最低杠杆
 	}
 
 	// 根据交易所类型设置API密钥

@@ -486,6 +486,10 @@ type TraderRecord struct {
 	OverrideBasePrompt   bool      `json:"override_base_prompt"`   // 是否覆盖基础prompt
 	SystemPromptTemplate string    `json:"system_prompt_template"` // 系统提示词模板名称
 	IsCrossMargin        bool      `json:"is_cross_margin"`        // 是否为全仓模式（true=全仓，false=逐仓）
+	TakerFeeRate         float64   `json:"taker_fee_rate"`         // Taker fee rate, default 0.0004
+	MakerFeeRate         float64   `json:"maker_fee_rate"`         // Maker fee rate, default 0.0002
+	EnableSmartFallback  bool      `json:"enable_smart_fallback"`  // 启用智能回退（保证金不足时自动调整）
+	MinLeverage          int       `json:"min_leverage"`           // 最低可降至的杠杆倍数（默认1x）
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
 }

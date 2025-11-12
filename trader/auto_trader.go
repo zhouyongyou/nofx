@@ -69,6 +69,14 @@ type AutoTraderConfig struct {
 	// 仓位模式
 	IsCrossMargin bool // true=全仓模式, false=逐仓模式
 
+	// 手续费配置
+	TakerFeeRate float64 // Taker 手续费率（默认 0.0004 即 0.04%）
+	MakerFeeRate float64 // Maker 手续费率（默认 0.0002 即 0.02%）
+
+	// Smart Fallback 智能回退配置
+	EnableSmartFallback bool // 启用智能回退（保证金不足时自动调整，默认 true）
+	MinLeverage         int  // 最低可降至的杠杆倍数（默认 1x）
+
 	// 币种配置
 	DefaultCoins []string // 默认币种列表（从数据库获取）
 	TradingCoins []string // 实际交易币种列表
@@ -753,6 +761,72 @@ func (at *AutoTrader) executeDecisionWithRecord(decision *decision.Decision, act
 	}
 }
 
+// trySmartFallback 尝试智能回退机制
+// 当保证金不足时，依次尝试：1) 微调持仓金额 2) 降低杠杆
+// 返回: (调整后的 PositionSizeUSD, 调整后的 Leverage, 是否成功, 调整记录)
+func (at *AutoTrader) trySmartFallback(
+	originalSize float64,
+	originalLeverage int,
+	availableBalance float64,
+	symbol string,
+	currentPrice float64,
+) (float64, int, bool, []string) {
+	adjustments := []string{}
+
+	// Step 1: 微调持仓金额（尝试 98%, 95%, 90%）
+	for _, factor := range []float64{0.98, 0.95, 0.90} {
+		adjustedSize := originalSize * factor
+		requiredMargin := adjustedSize / float64(originalLeverage)
+		estimatedFee := adjustedSize * at.config.TakerFeeRate
+		totalRequired := requiredMargin + estimatedFee
+
+		if totalRequired <= availableBalance {
+			msg := fmt.Sprintf("✓ 微调持仓: %.0f%% (%.2f → %.2f USDT)",
+				factor*100, originalSize, adjustedSize)
+			adjustments = append(adjustments, msg)
+			return adjustedSize, originalLeverage, true, adjustments
+		}
+	}
+
+	// Step 2: 降低杠杆（从 originalLeverage-1 降至 minLeverage）
+	minLev := at.config.MinLeverage
+	if minLev == 0 {
+		minLev = 1 // 默认最低1x
+	}
+
+	for lev := originalLeverage - 1; lev >= minLev; lev-- {
+		requiredMargin := originalSize / float64(lev)
+		estimatedFee := originalSize * at.config.TakerFeeRate
+		totalRequired := requiredMargin + estimatedFee
+
+		if totalRequired <= availableBalance {
+			msg := fmt.Sprintf("✓ 降低杠杆: %dx → %dx", originalLeverage, lev)
+			adjustments = append(adjustments, msg)
+			return originalSize, lev, true, adjustments
+		}
+	}
+
+	// Step 3: 组合策略（降低杠杆 + 微调持仓）
+	// 尝试在最低杠杆下微调持仓金额
+	for _, factor := range []float64{0.98, 0.95, 0.90, 0.85, 0.80} {
+		adjustedSize := originalSize * factor
+		requiredMargin := adjustedSize / float64(minLev)
+		estimatedFee := adjustedSize * at.config.TakerFeeRate
+		totalRequired := requiredMargin + estimatedFee
+
+		if totalRequired <= availableBalance {
+			msg1 := fmt.Sprintf("✓ 降低杠杆: %dx → %dx", originalLeverage, minLev)
+			msg2 := fmt.Sprintf("✓ 微调持仓: %.0f%% (%.2f → %.2f USDT)",
+				factor*100, originalSize, adjustedSize)
+			adjustments = append(adjustments, msg1, msg2)
+			return adjustedSize, minLev, true, adjustments
+		}
+	}
+
+	// Step 4: 放弃
+	return originalSize, originalLeverage, false, adjustments
+}
+
 // executeOpenLongWithRecord 执行开多仓并记录详细信息
 func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, actionRecord *logger.DecisionAction) error {
 	log.Printf("  📈 开多仓: %s", decision.Symbol)
@@ -790,13 +864,60 @@ func (at *AutoTrader) executeOpenLongWithRecord(decision *decision.Decision, act
 		availableBalance = avail
 	}
 
-	// 手续费估算（Taker费率 0.04%）
-	estimatedFee := decision.PositionSizeUSD * 0.0004
+	// 手续费估算（使用配置的 Taker 费率）
+	estimatedFee := decision.PositionSizeUSD * at.config.TakerFeeRate
 	totalRequired := requiredMargin + estimatedFee
 
 	if totalRequired > availableBalance {
-		return fmt.Errorf("❌ 保证金不足: 需要 %.2f USDT（保证金 %.2f + 手续费 %.2f），可用 %.2f USDT",
-			totalRequired, requiredMargin, estimatedFee, availableBalance)
+		// 尝试 Smart Fallback
+		if at.config.EnableSmartFallback {
+			log.Printf("  🔄 保证金不足，尝试 Smart Fallback...")
+			log.Printf("     原始: 持仓 %.2f USDT, 杠杆 %dx, 需要 %.2f USDT, 可用 %.2f USDT",
+				decision.PositionSizeUSD, decision.Leverage, totalRequired, availableBalance)
+
+			adjustedSize, adjustedLev, success, adjustments := at.trySmartFallback(
+				decision.PositionSizeUSD,
+				decision.Leverage,
+				availableBalance,
+				decision.Symbol,
+				marketData.CurrentPrice,
+			)
+
+			if success {
+				log.Printf("  ✅ Smart Fallback 成功:")
+				for _, adj := range adjustments {
+					log.Printf("     %s", adj)
+				}
+
+				// 更新决策参数
+				decision.PositionSizeUSD = adjustedSize
+				decision.Leverage = adjustedLev
+				quantity = adjustedSize / marketData.CurrentPrice
+				actionRecord.Quantity = quantity
+
+				// 重新计算（确保安全）
+				requiredMargin = adjustedSize / float64(adjustedLev)
+				estimatedFee = adjustedSize * at.config.TakerFeeRate
+				totalRequired = requiredMargin + estimatedFee
+
+				log.Printf("     调整后: 持仓 %.2f USDT, 杠杆 %dx, 需要 %.2f USDT",
+					adjustedSize, adjustedLev, totalRequired)
+			} else {
+				minLev := at.config.MinLeverage
+				if minLev == 0 {
+					minLev = 1
+				}
+				return fmt.Errorf("❌ Smart Fallback 失败: 即使降至 %dx 杠杆并调整持仓仍无法开仓\n"+
+					"   需要: %.2f USDT (保证金 %.2f + 手续费 %.2f)\n"+
+					"   可用: %.2f USDT\n"+
+					"   💡 建议: 增加初始资金或等待更好的入场时机",
+					minLev, totalRequired, requiredMargin, estimatedFee, availableBalance)
+			}
+		} else {
+			return fmt.Errorf("❌ 保证金不足: 需要 %.2f USDT（保证金 %.2f + 手续费 %.2f），可用 %.2f USDT\n"+
+				"💡 提示: 可在交易员配置中启用 Smart Fallback 自动调整",
+				totalRequired, requiredMargin, estimatedFee, availableBalance)
+		}
 	}
 
 	// 设置仓位模式
@@ -870,13 +991,60 @@ func (at *AutoTrader) executeOpenShortWithRecord(decision *decision.Decision, ac
 		availableBalance = avail
 	}
 
-	// 手续费估算（Taker费率 0.04%）
-	estimatedFee := decision.PositionSizeUSD * 0.0004
+	// 手续费估算（使用配置的 Taker 费率）
+	estimatedFee := decision.PositionSizeUSD * at.config.TakerFeeRate
 	totalRequired := requiredMargin + estimatedFee
 
 	if totalRequired > availableBalance {
-		return fmt.Errorf("❌ 保证金不足: 需要 %.2f USDT（保证金 %.2f + 手续费 %.2f），可用 %.2f USDT",
-			totalRequired, requiredMargin, estimatedFee, availableBalance)
+		// 尝试 Smart Fallback
+		if at.config.EnableSmartFallback {
+			log.Printf("  🔄 保证金不足，尝试 Smart Fallback...")
+			log.Printf("     原始: 持仓 %.2f USDT, 杠杆 %dx, 需要 %.2f USDT, 可用 %.2f USDT",
+				decision.PositionSizeUSD, decision.Leverage, totalRequired, availableBalance)
+
+			adjustedSize, adjustedLev, success, adjustments := at.trySmartFallback(
+				decision.PositionSizeUSD,
+				decision.Leverage,
+				availableBalance,
+				decision.Symbol,
+				marketData.CurrentPrice,
+			)
+
+			if success {
+				log.Printf("  ✅ Smart Fallback 成功:")
+				for _, adj := range adjustments {
+					log.Printf("     %s", adj)
+				}
+
+				// 更新决策参数
+				decision.PositionSizeUSD = adjustedSize
+				decision.Leverage = adjustedLev
+				quantity = adjustedSize / marketData.CurrentPrice
+				actionRecord.Quantity = quantity
+
+				// 重新计算（确保安全）
+				requiredMargin = adjustedSize / float64(adjustedLev)
+				estimatedFee = adjustedSize * at.config.TakerFeeRate
+				totalRequired = requiredMargin + estimatedFee
+
+				log.Printf("     调整后: 持仓 %.2f USDT, 杠杆 %dx, 需要 %.2f USDT",
+					adjustedSize, adjustedLev, totalRequired)
+			} else {
+				minLev := at.config.MinLeverage
+				if minLev == 0 {
+					minLev = 1
+				}
+				return fmt.Errorf("❌ Smart Fallback 失败: 即使降至 %dx 杠杆并调整持仓仍无法开仓\n"+
+					"   需要: %.2f USDT (保证金 %.2f + 手续费 %.2f)\n"+
+					"   可用: %.2f USDT\n"+
+					"   💡 建议: 增加初始资金或等待更好的入场时机",
+					minLev, totalRequired, requiredMargin, estimatedFee, availableBalance)
+			}
+		} else {
+			return fmt.Errorf("❌ 保证金不足: 需要 %.2f USDT（保证金 %.2f + 手续费 %.2f），可用 %.2f USDT\n"+
+				"💡 提示: 可在交易员配置中启用 Smart Fallback 自动调整",
+				totalRequired, requiredMargin, estimatedFee, availableBalance)
+		}
 	}
 
 	// 设置仓位模式

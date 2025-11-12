@@ -615,6 +615,10 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		SystemPromptTemplate: systemPromptTemplate,
 		IsCrossMargin:        isCrossMargin,
 		ScanIntervalMinutes:  scanIntervalMinutes,
+		TakerFeeRate:         0.0004, // 默认 Taker 费率 0.04%
+		MakerFeeRate:         0.0002, // 默认 Maker 费率 0.02%
+		EnableSmartFallback:  true,   // 默认启用智能回退
+		MinLeverage:          1,      // 最低可降至1x杠杆
 		IsRunning:            false,
 	}
 
@@ -719,6 +723,27 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		systemPromptTemplate = existingTrader.SystemPromptTemplate // 如果请求中没有提供，保持原值
 	}
 
+	// Smart Fallback 配置：保持原值，如果为空则使用默认值
+	enableSmartFallback := existingTrader.EnableSmartFallback
+	if !existingTrader.EnableSmartFallback && existingTrader.MinLeverage == 0 {
+		// 旧数据迁移：默认启用
+		enableSmartFallback = true
+	}
+	minLeverage := existingTrader.MinLeverage
+	if minLeverage == 0 {
+		minLeverage = 1 // 默认最低1x
+	}
+
+	// Taker/Maker 费率：保持原值，如果为0则使用默认值
+	takerFeeRate := existingTrader.TakerFeeRate
+	if takerFeeRate == 0 {
+		takerFeeRate = 0.0004 // 默认 0.04%
+	}
+	makerFeeRate := existingTrader.MakerFeeRate
+	if makerFeeRate == 0 {
+		makerFeeRate = 0.0002 // 默认 0.02%
+	}
+
 	// 更新交易员配置
 	trader := &config.TraderRecord{
 		ID:                   traderID,
@@ -735,6 +760,10 @@ func (s *Server) handleUpdateTrader(c *gin.Context) {
 		SystemPromptTemplate: systemPromptTemplate,
 		IsCrossMargin:        isCrossMargin,
 		ScanIntervalMinutes:  scanIntervalMinutes,
+		TakerFeeRate:         takerFeeRate,             // Taker 费率
+		MakerFeeRate:         makerFeeRate,             // Maker 费率
+		EnableSmartFallback:  enableSmartFallback,      // Smart Fallback 配置
+		MinLeverage:          minLeverage,              // 最低杠杆
 		IsRunning:            existingTrader.IsRunning, // 保持原值
 	}
 
