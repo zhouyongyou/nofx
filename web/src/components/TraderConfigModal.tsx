@@ -432,15 +432,8 @@ export function TraderConfigModal({
                         Number(e.target.value)
                       )
                     }
-                    onBlur={(e) => {
-                      // Force minimum value on blur
-                      const value = Number(e.target.value)
-                      if (value < 100) {
-                        handleInputChange('initial_balance', 100)
-                      }
-                    }}
                     className="w-full px-3 py-2 bg-[#0B0E11] border border-[#2B3139] rounded text-[#EAECEF] focus:border-[#F0B90B] focus:outline-none"
-                    min="100"
+                    min="0.01"
                     step="0.01"
                   />
                   {!isEditMode && (
@@ -459,7 +452,7 @@ export function TraderConfigModal({
                         <line x1="12" x2="12" y1="9" y2="13" />
                         <line x1="12" x2="12.01" y1="17" y2="17" />
                       </svg>
-                      请输入您交易所账户的当前实际余额。如果输入不准确，P&L统计将会错误。
+                      请输入您交易所账户的当前实际余额。建议最低 100 USDT，留空或输入 0 将自动从交易所获取。如果输入不准确，P&L 统计将会错误。
                     </p>
                   )}
                   {isEditMode && (

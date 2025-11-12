@@ -303,19 +303,15 @@ func (at *AutoTrader) autoSyncBalanceIfNeeded() {
 		return
 	}
 
-	// 提取可用余额
-	var actualBalance float64
-	if availableBalance, ok := balanceInfo["available_balance"].(float64); ok && availableBalance > 0 {
-		actualBalance = availableBalance
-	} else if availableBalance, ok := balanceInfo["availableBalance"].(float64); ok && availableBalance > 0 {
-		actualBalance = availableBalance
-	} else if totalBalance, ok := balanceInfo["balance"].(float64); ok && totalBalance > 0 {
-		actualBalance = totalBalance
-	} else {
-		log.Printf("⚠️ [%s] 无法提取可用余额", at.name)
+	// ✅ 提取总资产（total equity = 钱包余额 + 未实现盈亏）
+	// 使用统一的工具函数解析余额信息
+	totalEquity, success := ParseTotalEquity(balanceInfo, fmt.Sprintf("[%s]", at.name))
+	if !success {
+		log.Printf("❌ [%s] 无法提取余额信息，跳过本次同步", at.name)
 		at.lastBalanceSyncTime = time.Now()
 		return
 	}
+	actualBalance := totalEquity
 
 	oldBalance := at.initialBalance
 
@@ -375,7 +371,7 @@ func (at *AutoTrader) autoSyncBalanceIfNeeded() {
 			log.Printf("⚠️ [%s] 数据库引用为空，余额仅在内存中更新", at.name)
 		}
 	} else {
-		log.Printf("✓ [%s] 余额变化不大 (%.2f%%)，无需更新", at.name, changePercent)
+		log.Printf("✓ [%s] 余额变化不大 (%.2f%%)，无需更新 [当前总资产: %.2f USDT]", at.name, changePercent, actualBalance)
 	}
 
 	at.lastBalanceSyncTime = time.Now()
