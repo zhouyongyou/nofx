@@ -277,19 +277,17 @@ func TestGenerateJWT(t *testing.T) {
 		// Clear secret
 		JWTSecret = nil
 
-		// JWT library allows nil secret, but this creates security vulnerability
-		// Let's test that it generates a token (but it would be weak)
+		// After security fix, GenerateJWT should reject nil secret
 		tokenString, err := GenerateJWT("user-123", "test@example.com")
 
-		// The library doesn't prevent nil secret, so it succeeds
-		// This is a known issue - should be validated at application level
-		if err != nil {
-			t.Logf("GenerateJWT with nil secret error: %v", err)
-		} else {
-			t.Logf("WARNING: GenerateJWT succeeds with nil secret (security risk)")
-			if tokenString == "" {
-				t.Error("token should not be empty even with nil secret")
-			}
+		// Should return error when secret is not set
+		if err == nil {
+			t.Errorf("GenerateJWT should fail with nil secret, but got token: %s", tokenString)
+		}
+
+		// Verify error message is clear
+		if err != nil && err.Error() != "JWT密钥未设置，无法生成token" {
+			t.Errorf("expected specific error message, got: %v", err)
 		}
 
 		// Restore secret

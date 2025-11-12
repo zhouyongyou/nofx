@@ -113,6 +113,11 @@ func VerifyOTP(secret, code string) bool {
 
 // GenerateJWT 生成JWT token
 func GenerateJWT(userID, email string) (string, error) {
+	// 安全检查：确保JWT密钥已设置
+	if len(JWTSecret) == 0 {
+		return "", fmt.Errorf("JWT密钥未设置，无法生成token")
+	}
+
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
