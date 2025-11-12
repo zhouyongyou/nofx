@@ -1,0 +1,61 @@
+services:
+  # Backend service (API and core logic)
+  nofx:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.backend
+    container_name: nofx-trading-test
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "${NOFX_BACKEND_PORT:-8080}:8080"
+    volumes:
+      # Mount read-only config files (won't be modified)
+      - ./config.json:/app/config.json:ro
+      - ./beta_codes.txt:/app/beta_codes.txt:ro
+      - ./prompts:/app/prompts:ro
+      - ./secrets:/app/secrets:ro
+      - /etc/localtime:/etc/localtime:ro
+
+      # ⚠️ Database and logs use temporary volumes (cleared on restart)
+      # Not mounted to host, data only exists in container
+    tmpfs:
+      # Use in-memory filesystem (fastest, cleared on restart)
+      - /app/decision_logs
+    environment:
+      - TZ=${NOFX_TIMEZONE:-Asia/Shanghai}
+      - AI_MAX_TOKENS=4000
+      - DATA_ENCRYPTION_KEY=${DATA_ENCRYPTION_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - nofx-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend service (static serving and proxy)
+  nofx-frontend:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.frontend
+    container_name: nofx-frontend-test
+    restart: unless-stopped
+    ports:
+      - "${NOFX_FRONTEND_PORT:-3000}:80"
+    networks:
+      - nofx-network
+    depends_on:
+      - nofx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+networks:
+  nofx-network:
+    driver: bridge
