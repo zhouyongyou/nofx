@@ -1233,22 +1233,22 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 	log.Printf("  ✓ 部分平仓成功: 平仓 %.4f (%.1f%%), 剩余 %.4f",
 		closeQuantity, decision.ClosePercentage, remainingQuantity)
 
-	// ✅ Step 4: 恢复止盈止损（防止剩余仓位裸奔）
-	// 重要：币安等交易所在部分平仓后会自动取消原有的 TP/SL 订单（因为数量不匹配）
-	// 如果 AI 提供了新的止损止盈价格，则为剩余仓位重新设置保护
+	// ✅ Step 4: Restore TP/SL protection (prevent remaining position from being unprotected)
+	// IMPORTANT: Exchanges like Binance automatically cancel existing TP/SL orders after partial close (due to quantity mismatch)
+	// If AI provides new stop-loss/take-profit prices, reset protection for the remaining position
 	if decision.NewStopLoss > 0 {
-		log.Printf("  → 为剩余仓位 %.4f 恢复止损单: %.2f", remainingQuantity, decision.NewStopLoss)
+		log.Printf("  → Restoring stop-loss for remaining position %.4f: %.2f", remainingQuantity, decision.NewStopLoss)
 		err = at.trader.SetStopLoss(decision.Symbol, positionSide, remainingQuantity, decision.NewStopLoss)
 		if err != nil {
-			log.Printf("  ⚠️ 恢复止损失败: %v（不影响平仓结果）", err)
+			log.Printf("  ⚠️ Failed to restore stop-loss: %v (doesn't affect close result)", err)
 		}
 	}
 
 	if decision.NewTakeProfit > 0 {
-		log.Printf("  → 为剩余仓位 %.4f 恢复止盈单: %.2f", remainingQuantity, decision.NewTakeProfit)
+		log.Printf("  → Restoring take-profit for remaining position %.4f: %.2f", remainingQuantity, decision.NewTakeProfit)
 		err = at.trader.SetTakeProfit(decision.Symbol, positionSide, remainingQuantity, decision.NewTakeProfit)
 		if err != nil {
-			log.Printf("  ⚠️ 恢复止盈失败: %v（不影响平仓结果）", err)
+			log.Printf("  ⚠️ Failed to restore take-profit: %v (doesn't affect close result)", err)
 		}
 	}
 
