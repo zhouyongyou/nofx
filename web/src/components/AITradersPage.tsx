@@ -1801,6 +1801,13 @@ function ExchangeConfigModal({
     null | 'hyperliquid' | 'aster'
   >(null)
 
+// 顯示/隱藏敏感資訊
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [showSecretKey, setShowSecretKey] = useState(false)
+  const [showPassphrase, setShowPassphrase] = useState(false)
+  const [showAsterPrivateKey, setShowAsterPrivateKey] = useState(false)
+
+
   // 获取当前编辑的交易所信息
   const selectedExchange = allExchanges?.find(
     (e) => e.id === selectedExchangeId
@@ -2253,19 +2260,35 @@ function ExchangeConfigModal({
                           >
                             {t('passphrase', language)}
                           </label>
-                          <input
-                            type="password"
-                            value={passphrase}
-                            onChange={(e) => setPassphrase(e.target.value)}
-                            placeholder={t('enterPassphrase', language)}
-                            className="w-full px-3 py-2 rounded"
-                            style={{
-                              background: '#0B0E11',
-                              border: '1px solid #2B3139',
-                              color: '#EAECEF',
-                            }}
-                            required
-                          />
+                          <div className="relative">
+                            <input
+                              type={showPassphrase ? 'text' : 'password'}
+                              value={passphrase}
+                              onChange={(e) => setPassphrase(e.target.value)}
+                              placeholder={t('enterPassphrase', language)}
+                              className="w-full px-3 py-2 pr-10 rounded"
+                              style={{
+                                background: '#0B0E11',
+                                border: '1px solid #2B3139',
+                                color: '#EAECEF',
+                              }}
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassphrase(!showPassphrase)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded transition-colors"
+                              style={{
+                                color: '#848E9C',
+                                background: 'transparent'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(43, 49, 57, 0.6)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                              title={showPassphrase ? (language === 'zh' ? '隐藏' : 'Hide') : (language === 'zh' ? '显示' : 'Show')}
+                            >
+                              {showPassphrase ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
                         </div>
                       )}
 
