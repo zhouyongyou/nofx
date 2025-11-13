@@ -118,14 +118,12 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
   const { data: allModels, mutate: mutateModels } = useSWR<AIModel[]>(
     user && token ? 'models' : null,
-    api.getModelConfigs,
-    { refreshInterval: 10000 } // Auto-refresh every 10 seconds
+    api.getModelConfigs
   )
 
   const { data: allExchanges, mutate: mutateExchanges } = useSWR<Exchange[]>(
     user && token ? 'exchanges' : null,
-    api.getExchangeConfigs,
-    { refreshInterval: 10000 } // Auto-refresh every 10 seconds
+    api.getExchangeConfigs
   )
 
   // 加载支持的模型和交易所列表（用于选择）
@@ -359,32 +357,19 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       if (!ok) return
     }
 
-    // Save previous state for rollback
-    const previousTraders = traders
-
     try {
-      // Optimistic update - immediately remove from UI
-      mutateTraders(
-        traders?.filter((t) => t.trader_id !== traderId),
-        false
-      )
-
       await toast.promise(api.deleteTrader(traderId), {
         loading: '正在删除…',
         success: '删除成功',
         error: '删除失败',
       })
 
-      // Revalidate to ensure data consistency
+      // Immediately refresh traders list for better UX
       await mutateTraders()
 
       cacheManager.onTraderDeleted(traderId)
     } catch (error) {
       console.error('Failed to delete trader:', error)
-
-      // Rollback on error
-      mutateTraders(previousTraders, false)
-
       toast.error(t('deleteTraderFailed', language))
     }
   }
@@ -441,7 +426,7 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
     clearFields: (item: T) => T
     buildRequest: (items: T[]) => any
     updateApi: (request: any) => Promise<void>
-    setItems: (data?: T[] | Promise<T[]>, shouldRevalidate?: boolean) => Promise<T[] | undefined>
+    setItems: () => Promise<void>
     closeModal: () => void
     errorKey: string
   }) => {
@@ -460,17 +445,11 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       if (!ok) return
     }
 
-    // Save previous state for rollback
-    const previousItems = config.allItems
-
     try {
       const updatedItems =
         config.allItems?.map((item) =>
           item.id === config.id ? config.clearFields(item) : item
         ) || []
-
-      // Optimistic update - immediately update UI
-      config.setItems(updatedItems, false)
 
       const request = config.buildRequest(updatedItems)
       await toast.promise(config.updateApi(request), {
@@ -479,16 +458,12 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         error: '更新配置失败',
       })
 
-      // Revalidate to ensure data consistency
+      // 使用 SWR mutate 自动刷新数据（等待刷新完成）
       await config.setItems()
 
       config.closeModal()
     } catch (error) {
       console.error(`Failed to delete ${config.type} config:`, error)
-
-      // Rollback on error
-      config.setItems(previousItems, false)
-
       toast.error(t(config.errorKey, language))
     }
   }
@@ -523,7 +498,9 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         ),
       }),
       updateApi: api.updateModelConfigs,
-      setItems: mutateModels,
+      setItems: async () => {
+        await mutateModels() // 等待刷新完成
+      },
       closeModal: () => {
         setShowModelModal(false)
         setEditingModel(null)
@@ -591,27 +568,17 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         ),
       }
 
-      // Optimistic update - immediately update UI
-      const previousModels = allModels
-      mutateModels(updatedModels, false)
+      await toast.promise(api.updateModelConfigs(request), {
+        loading: '正在更新模型配置…',
+        success: '模型配置已更新',
+        error: '更新模型配置失败',
+      })
 
-      try {
-        await toast.promise(api.updateModelConfigs(request), {
-          loading: '正在更新模型配置…',
-          success: '模型配置已更新',
-          error: '更新模型配置失败',
-        })
+      // 自动刷新模型列表（等待刷新完成）
+      await mutateModels()
 
-        // Revalidate to ensure data consistency
-        await mutateModels()
-
-        setShowModelModal(false)
-        setEditingModel(null)
-      } catch (error) {
-        // Rollback on error
-        mutateModels(previousModels, false)
-        throw error // Re-throw to be caught by outer catch
-      }
+      setShowModelModal(false)
+      setEditingModel(null)
     } catch (error) {
       console.error('Failed to save model config:', error)
       toast.error(t('saveConfigFailed', language))
@@ -655,7 +622,9 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         ),
       }),
       updateApi: api.updateExchangeConfigsEncrypted,
-      setItems: mutateExchanges,
+      setItems: async () => {
+        await mutateExchanges() // 等待刷新完成
+      },
       closeModal: () => {
         setShowExchangeModal(false)
         setEditingExchange(null)
@@ -740,27 +709,17 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
         ),
       }
 
-      // Optimistic update - immediately update UI
-      const previousExchanges = allExchanges
-      mutateExchanges(updatedExchanges, false)
+      await toast.promise(api.updateExchangeConfigsEncrypted(request), {
+        loading: '正在更新交易所配置…',
+        success: '交易所配置已更新',
+        error: '更新交易所配置失败',
+      })
 
-      try {
-        await toast.promise(api.updateExchangeConfigsEncrypted(request), {
-          loading: '正在更新交易所配置…',
-          success: '交易所配置已更新',
-          error: '更新交易所配置失败',
-        })
+      // 自动刷新交易所列表（等待刷新完成）
+      await mutateExchanges()
 
-        // Revalidate to ensure data consistency
-        await mutateExchanges()
-
-        setShowExchangeModal(false)
-        setEditingExchange(null)
-      } catch (error) {
-        // Rollback on error
-        mutateExchanges(previousExchanges, false)
-        throw error // Re-throw to be caught by outer catch
-      }
+      setShowExchangeModal(false)
+      setEditingExchange(null)
     } catch (error) {
       console.error('Failed to save exchange config:', error)
       toast.error(t('saveConfigFailed', language))
