@@ -355,8 +355,8 @@ func setupTestDBForTimeframes(t *testing.T) (*Database, func()) {
 
 // setupAIModelAndExchange 創建測試用的 AI model 和 exchange，返回它們的 integer ID
 func setupAIModelAndExchange(t *testing.T, db *Database, userID string) (int, int) {
-	// 創建 AI model
-	err := db.UpdateAIModel(userID, "deepseek", "DeepSeek", "deepseek", true, "", "", "")
+	// 創建 AI model (id="deepseek", enabled=true, no custom configs)
+	err := db.UpdateAIModel(userID, "deepseek", true, "", "", "")
 	if err != nil {
 		t.Fatalf("創建 AI model 失敗: %v", err)
 	}
