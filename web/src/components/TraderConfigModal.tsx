@@ -440,7 +440,7 @@ export function TraderConfigModal({
                         }
                       }}
                       className="w-full px-3 py-2 bg-[#0B0E11] border border-[#2B3139] rounded text-[#EAECEF] focus:border-[#F0B90B] focus:outline-none"
-                      min="100"
+                      min="0.01"
                       step="0.01"
                     />
                     <p className="text-xs text-[#848E9C] mt-1">
