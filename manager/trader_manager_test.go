@@ -545,6 +545,372 @@ func TestRemoveTraderClearCache(t *testing.T) {
 	}
 }
 
+// TestLoadTradersFromDatabase tests loading traders from database
+func TestLoadTradersFromDatabase(t *testing.T) {
+	// Skip if DATA_ENCRYPTION_KEY not set
+	if os.Getenv("DATA_ENCRYPTION_KEY") == "" {
+		t.Skip("Skipping database test: DATA_ENCRYPTION_KEY not set")
+	}
+
+	// Create temporary database
+	tmpDB := filepath.Join(os.TempDir(), fmt.Sprintf("test_trader_manager_%d.db", time.Now().UnixNano()))
+	defer os.Remove(tmpDB)
+
+	db, err := config.NewDatabase(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	// Create test user
+	testUserID := "test-user-1"
+	err = db.CreateUser(testUserID, "test@example.com", "hashedpassword")
+	if err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	// Add AI model configuration
+	aiModel := &config.AIModelConfig{
+		ID:              1,
+		Provider:        "deepseek",
+		Enabled:         true,
+		CustomAPIURL:    "",
+		CustomModelName: "",
+	}
+	err = db.SaveAIModel(testUserID, aiModel)
+	if err != nil {
+		t.Fatalf("Failed to save AI model: %v", err)
+	}
+
+	// Add exchange configuration
+	exchange := &config.ExchangeConfig{
+		ID:         1,
+		ExchangeID: "binance",
+		Enabled:    true,
+		APIKey:     "test-api-key",
+		SecretKey:  "test-secret-key",
+		Testnet:    true,
+	}
+	err = db.SaveExchange(testUserID, exchange)
+	if err != nil {
+		t.Fatalf("Failed to save exchange: %v", err)
+	}
+
+	// Add trader configuration
+	trader := &config.TraderRecord{
+		ID:                   "trader-1",
+		Name:                 "Test Trader 1",
+		UserID:               testUserID,
+		AIModelID:            1,
+		ExchangeID:           1,
+		InitialBalance:       10000.0,
+		ScanIntervalMinutes:  5,
+		BTCETHLeverage:       1.0,
+		AltcoinLeverage:      2.0,
+		TakerFeeRate:         0.0005,
+		MakerFeeRate:         0.0002,
+		IsCrossMargin:        true,
+		TradingSymbols:       "BTCUSDT,ETHUSDT",
+		UseCoinPool:          false,
+		SystemPromptTemplate: "default",
+		OrderStrategy:        "market",
+	}
+	err = db.SaveTrader(trader)
+	if err != nil {
+		t.Fatalf("Failed to save trader: %v", err)
+	}
+
+	// Set system configuration
+	err = db.SetSystemConfig("max_daily_loss", "10.0")
+	if err != nil {
+		t.Fatalf("Failed to set max_daily_loss: %v", err)
+	}
+	err = db.SetSystemConfig("max_drawdown", "20.0")
+	if err != nil {
+		t.Fatalf("Failed to set max_drawdown: %v", err)
+	}
+	err = db.SetSystemConfig("stop_trading_minutes", "60")
+	if err != nil {
+		t.Fatalf("Failed to set stop_trading_minutes: %v", err)
+	}
+	err = db.SetSystemConfig("default_coins", `["BTCUSDT","ETHUSDT"]`)
+	if err != nil {
+		t.Fatalf("Failed to set default_coins: %v", err)
+	}
+
+	// Load traders using TraderManager
+	tm := NewTraderManager()
+	err = tm.LoadTradersFromDatabase(db)
+	if err != nil {
+		t.Fatalf("LoadTradersFromDatabase failed: %v", err)
+	}
+
+	// Verify trader was loaded
+	loadedTraders := tm.GetAllTraders()
+	if len(loadedTraders) != 1 {
+		t.Errorf("Expected 1 trader, got %d", len(loadedTraders))
+	}
+
+	loadedTrader := tm.GetTrader("trader-1")
+	if loadedTrader == nil {
+		t.Fatal("Trader 'trader-1' was not loaded")
+	}
+
+	// Verify trader configuration
+	if loadedTrader.ID != "trader-1" {
+		t.Errorf("Expected trader ID 'trader-1', got '%s'", loadedTrader.ID)
+	}
+	if loadedTrader.Name != "Test Trader 1" {
+		t.Errorf("Expected trader name 'Test Trader 1', got '%s'", loadedTrader.Name)
+	}
+}
+
+// TestLoadTradersFromDatabase_MultipleUsers tests loading traders from multiple users
+func TestLoadTradersFromDatabase_MultipleUsers(t *testing.T) {
+	// Skip if DATA_ENCRYPTION_KEY not set
+	if os.Getenv("DATA_ENCRYPTION_KEY") == "" {
+		t.Skip("Skipping database test: DATA_ENCRYPTION_KEY not set")
+	}
+
+	// Create temporary database
+	tmpDB := filepath.Join(os.TempDir(), fmt.Sprintf("test_multi_user_%d.db", time.Now().UnixNano()))
+	defer os.Remove(tmpDB)
+
+	db, err := config.NewDatabase(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	// Create two test users
+	users := []string{"user-1", "user-2"}
+	for _, userID := range users {
+		err = db.CreateUser(userID, fmt.Sprintf("%s@example.com", userID), "hashedpassword")
+		if err != nil {
+			t.Fatalf("Failed to create user %s: %v", userID, err)
+		}
+
+		// Add AI model and exchange for each user
+		aiModel := &config.AIModelConfig{
+			ID:       1,
+			Provider: "deepseek",
+			Enabled:  true,
+		}
+		err = db.SaveAIModel(userID, aiModel)
+		if err != nil {
+			t.Fatalf("Failed to save AI model for %s: %v", userID, err)
+		}
+
+		exchange := &config.ExchangeConfig{
+			ID:         1,
+			ExchangeID: "binance",
+			Enabled:    true,
+			APIKey:     fmt.Sprintf("api-key-%s", userID),
+			SecretKey:  fmt.Sprintf("secret-key-%s", userID),
+			Testnet:    true,
+		}
+		err = db.SaveExchange(userID, exchange)
+		if err != nil {
+			t.Fatalf("Failed to save exchange for %s: %v", userID, err)
+		}
+
+		// Add traders for each user
+		for i := 1; i <= 2; i++ {
+			trader := &config.TraderRecord{
+				ID:                  fmt.Sprintf("%s-trader-%d", userID, i),
+				Name:                fmt.Sprintf("Trader %d for %s", i, userID),
+				UserID:              userID,
+				AIModelID:           1,
+				ExchangeID:          1,
+				InitialBalance:      10000.0,
+				ScanIntervalMinutes: 5,
+				BTCETHLeverage:      1.0,
+				AltcoinLeverage:     2.0,
+				TakerFeeRate:        0.0005,
+				MakerFeeRate:        0.0002,
+				IsCrossMargin:       true,
+				TradingSymbols:      "BTCUSDT",
+				OrderStrategy:       "market",
+			}
+			err = db.SaveTrader(trader)
+			if err != nil {
+				t.Fatalf("Failed to save trader for %s: %v", userID, err)
+			}
+		}
+	}
+
+	// Set system configuration
+	db.SetSystemConfig("max_daily_loss", "10.0")
+	db.SetSystemConfig("max_drawdown", "20.0")
+	db.SetSystemConfig("stop_trading_minutes", "60")
+	db.SetSystemConfig("default_coins", `["BTCUSDT"]`)
+
+	// Load all traders
+	tm := NewTraderManager()
+	err = tm.LoadTradersFromDatabase(db)
+	if err != nil {
+		t.Fatalf("LoadTradersFromDatabase failed: %v", err)
+	}
+
+	// Verify 4 traders were loaded (2 users × 2 traders each)
+	loadedTraders := tm.GetAllTraders()
+	if len(loadedTraders) != 4 {
+		t.Errorf("Expected 4 traders, got %d", len(loadedTraders))
+	}
+
+	// Verify traders from both users are present
+	user1Count := 0
+	user2Count := 0
+	for _, tr := range loadedTraders {
+		if strings.HasPrefix(tr.ID, "user-1") {
+			user1Count++
+		} else if strings.HasPrefix(tr.ID, "user-2") {
+			user2Count++
+		}
+	}
+
+	if user1Count != 2 {
+		t.Errorf("Expected 2 traders for user-1, got %d", user1Count)
+	}
+	if user2Count != 2 {
+		t.Errorf("Expected 2 traders for user-2, got %d", user2Count)
+	}
+}
+
+// TestLoadTradersFromDatabase_DisabledConfigs tests that disabled AI models and exchanges are skipped
+func TestLoadTradersFromDatabase_DisabledConfigs(t *testing.T) {
+	// Skip if DATA_ENCRYPTION_KEY not set
+	if os.Getenv("DATA_ENCRYPTION_KEY") == "" {
+		t.Skip("Skipping database test: DATA_ENCRYPTION_KEY not set")
+	}
+
+	// Create temporary database
+	tmpDB := filepath.Join(os.TempDir(), fmt.Sprintf("test_disabled_%d.db", time.Now().UnixNano()))
+	defer os.Remove(tmpDB)
+
+	db, err := config.NewDatabase(tmpDB)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	// Create test user
+	testUserID := "test-user"
+	db.CreateUser(testUserID, "test@example.com", "hashedpassword")
+
+	// Add enabled AI model
+	enabledAI := &config.AIModelConfig{
+		ID:       1,
+		Provider: "deepseek",
+		Enabled:  true,
+	}
+	db.SaveAIModel(testUserID, enabledAI)
+
+	// Add disabled AI model
+	disabledAI := &config.AIModelConfig{
+		ID:       2,
+		Provider: "qwen",
+		Enabled:  false,
+	}
+	db.SaveAIModel(testUserID, disabledAI)
+
+	// Add enabled exchange
+	enabledExchange := &config.ExchangeConfig{
+		ID:         1,
+		ExchangeID: "binance",
+		Enabled:    true,
+		APIKey:     "api-key",
+		SecretKey:  "secret-key",
+		Testnet:    true,
+	}
+	db.SaveExchange(testUserID, enabledExchange)
+
+	// Add disabled exchange
+	disabledExchange := &config.ExchangeConfig{
+		ID:         2,
+		ExchangeID: "hyperliquid",
+		Enabled:    false,
+		APIKey:     "api-key",
+		Testnet:    true,
+	}
+	db.SaveExchange(testUserID, disabledExchange)
+
+	// Add trader with enabled configs
+	trader1 := &config.TraderRecord{
+		ID:                  "trader-enabled",
+		Name:                "Enabled Trader",
+		UserID:              testUserID,
+		AIModelID:           1,
+		ExchangeID:          1,
+		InitialBalance:      10000.0,
+		ScanIntervalMinutes: 5,
+		BTCETHLeverage:      1.0,
+		AltcoinLeverage:     2.0,
+		TakerFeeRate:        0.0005,
+		MakerFeeRate:        0.0002,
+		OrderStrategy:       "market",
+	}
+	db.SaveTrader(trader1)
+
+	// Add trader with disabled AI model
+	trader2 := &config.TraderRecord{
+		ID:                  "trader-disabled-ai",
+		Name:                "Disabled AI Trader",
+		UserID:              testUserID,
+		AIModelID:           2, // disabled
+		ExchangeID:          1,
+		InitialBalance:      10000.0,
+		ScanIntervalMinutes: 5,
+		BTCETHLeverage:      1.0,
+		AltcoinLeverage:     2.0,
+		TakerFeeRate:        0.0005,
+		MakerFeeRate:        0.0002,
+		OrderStrategy:       "market",
+	}
+	db.SaveTrader(trader2)
+
+	// Add trader with disabled exchange
+	trader3 := &config.TraderRecord{
+		ID:                  "trader-disabled-exchange",
+		Name:                "Disabled Exchange Trader",
+		UserID:              testUserID,
+		AIModelID:           1,
+		ExchangeID:          2, // disabled
+		InitialBalance:      10000.0,
+		ScanIntervalMinutes: 5,
+		BTCETHLeverage:      1.0,
+		AltcoinLeverage:     2.0,
+		TakerFeeRate:        0.0005,
+		MakerFeeRate:        0.0002,
+		OrderStrategy:       "market",
+	}
+	db.SaveTrader(trader3)
+
+	// Set system configuration
+	db.SetSystemConfig("max_daily_loss", "10.0")
+	db.SetSystemConfig("max_drawdown", "20.0")
+	db.SetSystemConfig("stop_trading_minutes", "60")
+	db.SetSystemConfig("default_coins", `["BTCUSDT"]`)
+
+	// Load traders
+	tm := NewTraderManager()
+	err = tm.LoadTradersFromDatabase(db)
+	if err != nil {
+		t.Fatalf("LoadTradersFromDatabase failed: %v", err)
+	}
+
+	// Only the trader with enabled configs should be loaded
+	loadedTraders := tm.GetAllTraders()
+	if len(loadedTraders) != 1 {
+		t.Errorf("Expected 1 enabled trader, got %d", len(loadedTraders))
+	}
+
+	// Verify it's the correct trader
+	if loadedTraders[0].ID != "trader-enabled" {
+		t.Errorf("Expected trader 'trader-enabled', got '%s'", loadedTraders[0].ID)
+	}
+}
+
 // TestAddTraderFromDB tests adding trader from database configuration
 func TestAddTraderFromDB(t *testing.T) {
 	// This test requires a real database, so we skip if not available
