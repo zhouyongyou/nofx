@@ -122,10 +122,10 @@ type RefreshClaims struct {
 
 // TokenPair Access Token 和 Refresh Token 对
 type TokenPair struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`     // Access Token 过期时间（秒）
-	RefreshExpiresIn int64 `json:"refresh_expires_in"` // Refresh Token 过期时间（秒）
+	AccessToken      string `json:"access_token"`
+	RefreshToken     string `json:"refresh_token"`
+	ExpiresIn        int64  `json:"expires_in"`         // Access Token 过期时间（秒）
+	RefreshExpiresIn int64  `json:"refresh_expires_in"` // Refresh Token 过期时间（秒）
 }
 
 // HashPassword 哈希密码

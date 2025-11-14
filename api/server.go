@@ -234,9 +234,9 @@ func (s *Server) handleGetCSRFToken(c *gin.Context) {
 	token := middleware.GetCSRFToken(c, csrfConfig)
 
 	c.JSON(http.StatusOK, gin.H{
-		"csrf_token": token,
+		"csrf_token":  token,
 		"header_name": csrfConfig.HeaderName,
-		"note": "Please include this token in the X-CSRF-Token header for POST/PUT/DELETE requests",
+		"note":        "Please include this token in the X-CSRF-Token header for POST/PUT/DELETE requests",
 	})
 }
 

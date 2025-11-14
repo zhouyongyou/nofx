@@ -134,15 +134,15 @@ func TestReloadAIModelConfig_QwenModel(t *testing.T) {
 // TestReloadAIModelConfig_PreservesOtherConfig 测试配置更新不影响其他配置项
 func TestReloadAIModelConfig_PreservesOtherConfig(t *testing.T) {
 	initialConfig := AutoTraderConfig{
-		ID:               "test_trader",
-		Name:             "Test Trader",
-		AIModel:          "deepseek",
-		CustomModelName:  "deepseek",
-		InitialBalance:   1000.0,
-		BTCETHLeverage:   5,
-		AltcoinLeverage:  3,
-		IsCrossMargin:    true,
-		DefaultCoins:     []string{"BTC", "ETH"},
+		ID:              "test_trader",
+		Name:            "Test Trader",
+		AIModel:         "deepseek",
+		CustomModelName: "deepseek",
+		InitialBalance:  1000.0,
+		BTCETHLeverage:  5,
+		AltcoinLeverage: 3,
+		IsCrossMargin:   true,
+		DefaultCoins:    []string{"BTC", "ETH"},
 	}
 
 	trader, err := NewAutoTrader(initialConfig, nil, "test_user")

@@ -12,13 +12,13 @@ import (
 
 // CSRFConfig CSRF 中间件配置
 type CSRFConfig struct {
-	TokenLength    int      // Token 长度（字节）
-	CookieName     string   // Cookie 名称
-	HeaderName     string   // Header 名称
-	CookiePath     string   // Cookie 路径
-	CookieSecure   bool     // 是否仅 HTTPS
+	TokenLength    int           // Token 长度（字节）
+	CookieName     string        // Cookie 名称
+	HeaderName     string        // Header 名称
+	CookiePath     string        // Cookie 路径
+	CookieSecure   bool          // 是否仅 HTTPS
 	CookieSameSite http.SameSite // SameSite 属性
-	ExemptPaths    []string // 豁免路径（不检查 CSRF）
+	ExemptPaths    []string      // 豁免路径（不检查 CSRF）
 }
 
 // DefaultCSRFConfig 返回默认 CSRF 配置
@@ -37,12 +37,12 @@ func DefaultCSRFConfig() CSRFConfig {
 			"/api/config",
 			"/api/crypto/public-key",
 			"/api/prompt-templates",
-			"/api/traders",          // 公开的 Trader 列表
-			"/api/competition",      // 公开的竞赛数据
-			"/api/top-traders",      // 公开的 Top Traders
-			"/api/equity-history",   // 公开的权益历史
-			"/api/login",            // 登录端点豁免（首次访问）
-			"/api/register",         // 注册端点豁免
+			"/api/traders",        // 公开的 Trader 列表
+			"/api/competition",    // 公开的竞赛数据
+			"/api/top-traders",    // 公开的 Top Traders
+			"/api/equity-history", // 公开的权益历史
+			"/api/login",          // 登录端点豁免（首次访问）
+			"/api/register",       // 注册端点豁免
 		},
 	}
 }

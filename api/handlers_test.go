@@ -434,18 +434,18 @@ func TestHandleCreateTrader(t *testing.T) {
 
 	// Prepare create request (use string IDs, not integer IDs)
 	createReq := map[string]interface{}{
-		"name":                   "New Test Trader",
-		"ai_model_id":            "test-model", // String model_id, not integer ID
-		"exchange_id":            "binance",    // String exchange_id, not integer ID
-		"initial_balance":        1500.0,
-		"scan_interval_minutes":  5,
-		"btc_eth_leverage":       3,
-		"altcoin_leverage":       3,
-		"trading_symbols":        "BTCUSDT,ETHUSDT",
-		"use_coin_pool":          false,
-		"use_oi_top":             false,
-		"custom_prompt":          "",
-		"override_base_prompt":   false,
+		"name":                  "New Test Trader",
+		"ai_model_id":           "test-model", // String model_id, not integer ID
+		"exchange_id":           "binance",    // String exchange_id, not integer ID
+		"initial_balance":       1500.0,
+		"scan_interval_minutes": 5,
+		"btc_eth_leverage":      3,
+		"altcoin_leverage":      3,
+		"trading_symbols":       "BTCUSDT,ETHUSDT",
+		"use_coin_pool":         false,
+		"use_oi_top":            false,
+		"custom_prompt":         "",
+		"override_base_prompt":  false,
 	}
 	reqBody, _ := json.Marshal(createReq)
 
