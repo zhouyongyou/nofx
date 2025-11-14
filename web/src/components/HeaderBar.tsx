@@ -100,7 +100,7 @@ export default function HeaderBar({
                       currentPage === 'competition'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
@@ -139,7 +139,7 @@ export default function HeaderBar({
                       currentPage === 'traders'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
@@ -178,7 +178,7 @@ export default function HeaderBar({
                       currentPage === 'trader'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
@@ -221,7 +221,7 @@ export default function HeaderBar({
                       currentPage === 'faq'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
@@ -265,7 +265,7 @@ export default function HeaderBar({
                       currentPage === 'prompts'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
@@ -305,7 +305,7 @@ export default function HeaderBar({
                       currentPage === 'competition'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
@@ -342,7 +342,7 @@ export default function HeaderBar({
                       currentPage === 'faq'
                         ? 'var(--brand-yellow)'
                         : 'var(--brand-light-gray)',
-                    padding: '8px 16px',
+                    padding: '6px 12px',
                     borderRadius: '8px',
                     position: 'relative',
                   }}
