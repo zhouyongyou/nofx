@@ -16,7 +16,11 @@ import (
 
 func TestNew(t *testing.T) {
 	t.Run("default configuration", func(t *testing.T) {
-		client := New()
+		aiClient := New()
+		client, ok := aiClient.(*Client)
+		if !ok {
+			t.Fatal("expected *Client type")
+		}
 
 		if client.Provider != ProviderDeepSeek {
 			t.Errorf("expected provider %v, got %v", ProviderDeepSeek, client.Provider)
@@ -44,7 +48,11 @@ func TestNew(t *testing.T) {
 		os.Setenv("AI_MAX_TOKENS", "5000")
 		defer os.Unsetenv("AI_MAX_TOKENS")
 
-		client := New()
+		aiClient := New()
+		client, ok := aiClient.(*Client)
+		if !ok {
+			t.Fatal("expected *Client type")
+		}
 
 		if client.MaxTokens != 5000 {
 			t.Errorf("expected MaxTokens 5000, got %d", client.MaxTokens)
@@ -55,7 +63,11 @@ func TestNew(t *testing.T) {
 		os.Setenv("AI_MAX_TOKENS", "invalid")
 		defer os.Unsetenv("AI_MAX_TOKENS")
 
-		client := New()
+		aiClient := New()
+	client, ok := aiClient.(*Client)
+	if !ok {
+		t.Fatal("expected *Client type")
+	}
 
 		// Should use default value
 		if client.MaxTokens != 2000 {
@@ -70,40 +82,48 @@ func TestNew(t *testing.T) {
 
 func TestSetDeepSeekAPIKey(t *testing.T) {
 	t.Run("with default URL and model", func(t *testing.T) {
-		client := New()
-		client.SetDeepSeekAPIKey("test-api-key-1234567890", "", "")
+		aiClient := NewDeepSeekClient()
+		dsClient, ok := aiClient.(*DeepSeekClient)
+		if !ok {
+			t.Fatal("expected *DeepSeekClient type")
+		}
+		dsClient.SetAPIKey("test-api-key-1234567890", "", "")
 
-		if client.Provider != ProviderDeepSeek {
-			t.Errorf("expected provider %v, got %v", ProviderDeepSeek, client.Provider)
+		if dsClient.Client.Provider != ProviderDeepSeek {
+			t.Errorf("expected provider %v, got %v", ProviderDeepSeek, dsClient.Client.Provider)
 		}
 
-		if client.APIKey != "test-api-key-1234567890" {
+		if dsClient.Client.APIKey != "test-api-key-1234567890" {
 			t.Errorf("API key not set correctly")
 		}
 
-		if client.BaseURL != "https://api.deepseek.com/v1" {
-			t.Errorf("expected default BaseURL, got %s", client.BaseURL)
+		if dsClient.Client.BaseURL != "https://api.deepseek.com/v1" {
+			t.Errorf("expected default BaseURL, got %s", dsClient.Client.BaseURL)
 		}
 
-		if client.Model != "deepseek-chat" {
-			t.Errorf("expected default model, got %s", client.Model)
+		if dsClient.Client.Model != "deepseek-chat" {
+			t.Errorf("expected default model, got %s", dsClient.Client.Model)
 		}
 	})
 
 	t.Run("with custom URL and model", func(t *testing.T) {
-		client := New()
-		client.SetDeepSeekAPIKey(
+		aiClient := NewDeepSeekClient()
+		dsClient, ok := aiClient.(*DeepSeekClient)
+		if !ok {
+			t.Fatal("expected *DeepSeekClient type")
+		}
+		dsClient.SetAPIKey(
 			"test-key",
 			"https://custom.api.com/v1",
 			"custom-model",
 		)
 
-		if client.BaseURL != "https://custom.api.com/v1" {
-			t.Errorf("custom BaseURL not set: %s", client.BaseURL)
+		if dsClient.Client.BaseURL != "https://custom.api.com/v1" {
+			t.Errorf("custom BaseURL not set: %s", dsClient.Client.BaseURL)
 		}
 
-		if client.Model != "custom-model" {
-			t.Errorf("custom model not set: %s", client.Model)
+		if dsClient.Client.Model != "custom-model" {
+			t.Errorf("custom model not set: %s", dsClient.Client.Model)
 		}
 	})
 }
@@ -114,40 +134,48 @@ func TestSetDeepSeekAPIKey(t *testing.T) {
 
 func TestSetQwenAPIKey(t *testing.T) {
 	t.Run("with default URL and model", func(t *testing.T) {
-		client := New()
-		client.SetQwenAPIKey("qwen-api-key-1234567890", "", "")
+		aiClient := NewQwenClient()
+		qwenClient, ok := aiClient.(*QwenClient)
+		if !ok {
+			t.Fatal("expected *QwenClient type")
+		}
+		qwenClient.SetAPIKey("qwen-api-key-1234567890", "", "")
 
-		if client.Provider != ProviderQwen {
-			t.Errorf("expected provider %v, got %v", ProviderQwen, client.Provider)
+		if qwenClient.Client.Provider != ProviderQwen {
+			t.Errorf("expected provider %v, got %v", ProviderQwen, qwenClient.Client.Provider)
 		}
 
-		if client.APIKey != "qwen-api-key-1234567890" {
+		if qwenClient.Client.APIKey != "qwen-api-key-1234567890" {
 			t.Errorf("API key not set correctly")
 		}
 
-		if client.BaseURL != "https://dashscope.aliyuncs.com/compatible-mode/v1" {
-			t.Errorf("unexpected BaseURL: %s", client.BaseURL)
+		if qwenClient.Client.BaseURL != "https://dashscope.aliyuncs.com/compatible-mode/v1" {
+			t.Errorf("unexpected BaseURL: %s", qwenClient.Client.BaseURL)
 		}
 
-		if client.Model != "qwen3-max" {
-			t.Errorf("unexpected model: %s", client.Model)
+		if qwenClient.Client.Model != "qwen3-max" {
+			t.Errorf("unexpected model: %s", qwenClient.Client.Model)
 		}
 	})
 
 	t.Run("with custom URL and model", func(t *testing.T) {
-		client := New()
-		client.SetQwenAPIKey(
+		aiClient := NewQwenClient()
+		qwenClient, ok := aiClient.(*QwenClient)
+		if !ok {
+			t.Fatal("expected *QwenClient type")
+		}
+		qwenClient.SetAPIKey(
 			"qwen-key",
 			"https://custom-qwen.com/v1",
 			"qwen-custom",
 		)
 
-		if client.BaseURL != "https://custom-qwen.com/v1" {
-			t.Errorf("custom BaseURL not set: %s", client.BaseURL)
+		if qwenClient.Client.BaseURL != "https://custom-qwen.com/v1" {
+			t.Errorf("custom BaseURL not set: %s", qwenClient.Client.BaseURL)
 		}
 
-		if client.Model != "qwen-custom" {
-			t.Errorf("custom model not set: %s", client.Model)
+		if qwenClient.Client.Model != "qwen-custom" {
+			t.Errorf("custom model not set: %s", qwenClient.Client.Model)
 		}
 	})
 }
@@ -158,10 +186,14 @@ func TestSetQwenAPIKey(t *testing.T) {
 
 func TestSetCustomAPI(t *testing.T) {
 	t.Run("without # suffix", func(t *testing.T) {
-		client := New()
-		client.SetCustomAPI(
-			"https://custom-ai.com/v1",
+		aiClient := New()
+		client, ok := aiClient.(*Client)
+		if !ok {
+			t.Fatal("expected *Client type")
+		}
+		client.SetAPIKey(
 			"custom-key-1234567890",
+			"https://custom-ai.com/v1",
 			"custom-model-v1",
 		)
 
@@ -187,10 +219,14 @@ func TestSetCustomAPI(t *testing.T) {
 	})
 
 	t.Run("with # suffix for full URL", func(t *testing.T) {
-		client := New()
-		client.SetCustomAPI(
-			"https://custom-ai.com/v1/chat#",
+		aiClient := New()
+		client, ok := aiClient.(*Client)
+		if !ok {
+			t.Fatal("expected *Client type")
+		}
+		client.SetAPIKey(
 			"custom-key",
+			"https://custom-ai.com/v1/chat#",
 			"custom-model",
 		)
 
@@ -291,7 +327,11 @@ func TestCallWithMessages_Success(t *testing.T) {
 // =============================================================================
 
 func TestCallWithMessages_MissingAPIKey(t *testing.T) {
-	client := New()
+	aiClient := New()
+	client, ok := aiClient.(*Client)
+	if !ok {
+		t.Fatal("expected *Client type")
+	}
 	// Don't set API key
 
 	_, err := client.CallWithMessages("system", "user")
