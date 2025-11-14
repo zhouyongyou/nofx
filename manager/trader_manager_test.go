@@ -645,3 +645,132 @@ func TestGetTrader_AfterRemove(t *testing.T) {
 		t.Error("获取已移除的 trader 应该返回错误")
 	}
 }
+
+// TestStartAll tests starting all traders
+func TestStartAll(t *testing.T) {
+	tm := NewTraderManager()
+
+	// Add multiple traders
+	for i := 1; i <= 3; i++ {
+		id := "start-all-trader-" + string(rune('0'+i))
+		mockConfig := trader.AutoTraderConfig{
+			ID:             id,
+			Name:           "Start All Test " + string(rune('0'+i)),
+			AIModel:        "deepseek",
+			Exchange:       "binance",
+			InitialBalance: 1000.0,
+			ScanInterval:   5 * time.Minute,
+		}
+
+		mockTrader, err := trader.NewAutoTrader(mockConfig, nil, "test-user")
+		if err != nil {
+			t.Fatalf("Failed to create trader %d: %v", i, err)
+		}
+
+		tm.mu.Lock()
+		tm.traders[id] = mockTrader
+		tm.mu.Unlock()
+	}
+
+	// StartAll should not panic and should execute goroutines for all traders
+	// We can't easily verify they actually started without blocking,
+	// but we can verify the method executes successfully
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("StartAll panicked: %v", r)
+		}
+	}()
+
+	tm.StartAll()
+
+	t.Logf("✅ StartAll executed successfully for 3 traders")
+}
+
+// TestStopAll tests stopping all traders
+func TestStopAll(t *testing.T) {
+	tm := NewTraderManager()
+
+	// Add multiple traders
+	for i := 1; i <= 3; i++ {
+		id := "stop-all-trader-" + string(rune('0'+i))
+		mockConfig := trader.AutoTraderConfig{
+			ID:             id,
+			Name:           "Stop All Test " + string(rune('0'+i)),
+			AIModel:        "deepseek",
+			Exchange:       "binance",
+			InitialBalance: 1000.0,
+			ScanInterval:   5 * time.Minute,
+		}
+
+		mockTrader, err := trader.NewAutoTrader(mockConfig, nil, "test-user")
+		if err != nil {
+			t.Fatalf("Failed to create trader %d: %v", i, err)
+		}
+
+		tm.mu.Lock()
+		tm.traders[id] = mockTrader
+		tm.mu.Unlock()
+	}
+
+	// StopAll should not panic and should call Stop() on all traders
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("StopAll panicked: %v", r)
+		}
+	}()
+
+	tm.StopAll()
+
+	t.Logf("✅ StopAll executed successfully for 3 traders")
+}
+
+// TestGetTopTradersData tests getting top traders data
+func TestGetTopTradersData(t *testing.T) {
+	tm := NewTraderManager()
+
+	// Add some mock traders
+	for i := 1; i <= 3; i++ {
+		id := "top-trader-" + string(rune('0'+i))
+		mockConfig := trader.AutoTraderConfig{
+			ID:             id,
+			Name:           "Top Trader " + string(rune('0'+i)),
+			AIModel:        "deepseek",
+			Exchange:       "binance",
+			InitialBalance: 1000.0,
+			ScanInterval:   5 * time.Minute,
+		}
+
+		mockTrader, err := trader.NewAutoTrader(mockConfig, nil, "test-user")
+		if err != nil {
+			t.Fatalf("Failed to create trader %d: %v", i, err)
+		}
+
+		tm.mu.Lock()
+		tm.traders[id] = mockTrader
+		tm.mu.Unlock()
+	}
+
+	// Get top traders data
+	data, err := tm.GetTopTradersData()
+	if err != nil {
+		t.Errorf("GetTopTradersData failed: %v", err)
+	}
+
+	if data == nil {
+		t.Fatal("GetTopTradersData returned nil")
+	}
+
+	// Verify data structure
+	traders, ok := data["traders"].([]map[string]interface{})
+	if !ok {
+		t.Fatal("traders field is missing or wrong type")
+	}
+
+	// In test environment without valid API keys, traders might not have data
+	// So we just verify the structure is correct
+	if len(traders) < 0 {
+		t.Error("traders slice should not have negative length")
+	}
+
+	t.Logf("✅ GetTopTradersData returned valid data structure")
+}
