@@ -574,12 +574,15 @@ export function TraderConfigModal({
                       { value: '1d', label: '1天' },
                     ]
 
-                    // 根据扫描间隔添加短周期线
-                    const frames = interval === 1
-                      ? [{ value: '1m', label: '1分钟' }, ...baseFrames]
-                      : interval === 3
-                      ? [{ value: '3m', label: '3分钟' }, ...baseFrames]
-                      : baseFrames
+                    // 根据扫描间隔智能添加短周期线
+                    const getShortFrames = () => {
+                      if (interval <= 2) return [{ value: '1m', label: '1分钟' }]
+                      if (interval === 3) return [{ value: '3m', label: '3分钟' }]
+                      if (interval >= 5 && interval < 15) return [{ value: '5m', label: '5分钟' }]
+                      return []
+                    }
+
+                    const frames = [...getShortFrames(), ...baseFrames]
 
                     const selectedFrames = formData.timeframes.split(',').filter(t => t)
 
@@ -614,8 +617,8 @@ export function TraderConfigModal({
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
                   {language === 'zh'
-                    ? '根据扫描间隔自动调整：1分钟扫描只显示1分钟线，3分钟扫描只显示3分钟线。默认勾选4小时线。'
-                    : 'Auto-adjusted by scan interval: 1min scan shows 1m only, 3min scan shows 3m only. 4h is selected by default.'}
+                    ? '根据扫描间隔智能添加短周期线：≤2分钟添加1m，3分钟添加3m，5-14分钟添加5m。默认勾选4小时线。'
+                    : 'Smart short-period options: ≤2min adds 1m, 3min adds 3m, 5-14min adds 5m. 4h is selected by default.'}
                 </p>
               </div>
 
