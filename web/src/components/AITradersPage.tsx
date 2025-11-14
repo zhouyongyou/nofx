@@ -282,7 +282,6 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
       await mutateTraders()
 
       setShowCreateModal(false)
-      cacheManager.onTraderCreated()
     } catch (error) {
       console.error('Failed to create trader:', error)
       toast.error(t('createTraderFailed', language))
@@ -346,7 +345,6 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
       setShowEditModal(false)
       setEditingTrader(null)
-      cacheManager.onTraderUpdated(traderId)
     } catch (error) {
       console.error('Failed to update trader:', error)
       toast.error(t('updateTraderFailed', language))
@@ -368,8 +366,6 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
       // Immediately refresh traders list for better UX
       await mutateTraders()
-
-      cacheManager.onTraderDeleted(traderId)
     } catch (error) {
       console.error('Failed to delete trader:', error)
       toast.error(t('deleteTraderFailed', language))
@@ -394,8 +390,6 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
 
       // Immediately refresh traders list to update running status
       await mutateTraders()
-
-      cacheManager.onTraderStateChanged(traderId)
     } catch (error) {
       console.error('Failed to toggle trader:', error)
       toast.error(t('operationFailed', language))
