@@ -837,7 +837,7 @@ export default function HeaderBar({
                   />
                 )}
 
-                💬 {language === 'zh' ? '提示词' : 'Prompts'}
+                {language === 'zh' ? '提示词' : 'Prompts'}
               </button>
             </>
           )}
