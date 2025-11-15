@@ -181,7 +181,12 @@ func (m *WSMonitor) initializeHistoricalData() error {
 						log.Printf("获取 %s %s历史数据失败: %v", s, tf, err)
 					}
 				} else if len(klines) > 0 {
-					klineDataMap.Store(s, klines)
+					// ✅ 修复类型不一致：使用 KlineCacheEntry 包装
+					entry := &KlineCacheEntry{
+						Klines:     klines,
+						ReceivedAt: time.Now(),
+					}
+					klineDataMap.Store(s, entry)
 					log.Printf("✅ 已加载 %s 的历史K线数据-%s: %d 条", s, tf, len(klines))
 				} else {
 					log.Printf("⚠️  WARNING: %s %s数据为空（API返回成功但无数据）", s, tf)
