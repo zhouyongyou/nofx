@@ -634,11 +634,11 @@ export default function HeaderBar({
           {isLoggedIn ? (
             <button
               onClick={() => {
-                console.log(
-                  '移动端 实时 button clicked, onPageChange:',
-                  onPageChange
-                )
-                onPageChange?.('competition')
+                if (onPageChange) {
+                  onPageChange('competition')
+                } else {
+                  navigate('/competition')
+                }
                 setMobileMenuOpen(false)
               }}
               className="block text-sm font-bold transition-all duration-300 relative focus:outline-2 focus:outline-yellow-500"
