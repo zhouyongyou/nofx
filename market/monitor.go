@@ -26,6 +26,7 @@ type WSMonitor struct {
 	alertsChan      chan Alert
 	klineDataMap1m  sync.Map      // 存储每个交易对的1分钟K线历史数据
 	klineDataMap3m  sync.Map      // 存储每个交易对的3分钟K线历史数据
+	klineDataMap5m  sync.Map      // 存储每个交易对的5分钟K线历史数据
 	klineDataMap15m sync.Map      // 存储每个交易对的15分钟K线历史数据
 	klineDataMap1h  sync.Map      // 存储每个交易对的1小时K线历史数据
 	klineDataMap4h  sync.Map      // 存储每个交易对的4小时K线历史数据
@@ -307,6 +308,8 @@ func (m *WSMonitor) getKlineDataMap(_time string) *sync.Map {
 		klineDataMap = &m.klineDataMap1m
 	case "3m":
 		klineDataMap = &m.klineDataMap3m
+	case "5m":
+		klineDataMap = &m.klineDataMap5m
 	case "15m":
 		klineDataMap = &m.klineDataMap15m
 	case "1h":
