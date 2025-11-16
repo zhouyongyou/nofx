@@ -289,3 +289,8 @@ export function ModelConfigModal({
     </div>
   )
 }
+  useEffect(() => {
+    if (!editingModelId && !selectedModelId && availableModels.length > 0) {
+      setSelectedModelId(availableModels[0].id)
+    }
+  }, [editingModelId, selectedModelId, availableModels])

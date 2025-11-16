@@ -561,22 +561,11 @@ func (d *Database) initDefaultData() error {
 
 // ensureDefaultUser 确保系统保留的 default 用户存在
 func (d *Database) ensureDefaultUser() error {
-	var count int
-	if err := d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = 'default'`).Scan(&count); err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
-
-	user := &User{
-		ID:           "default",
-		Email:        "default@localhost",
-		PasswordHash: "",
-		OTPSecret:    "",
-		OTPVerified:  true,
-	}
-	return d.CreateUser(user)
+	_, err := d.db.Exec(`
+		INSERT OR IGNORE INTO users (id, email, password_hash, otp_secret, otp_verified)
+		VALUES ('default', 'default@system.local', '', '', 1)
+	`)
+	return err
 }
 
 // migrateExchangesTable 迁移exchanges表支持多用户

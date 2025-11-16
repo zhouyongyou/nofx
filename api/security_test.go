@@ -2,7 +2,15 @@ package api
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"nofx/auth"
@@ -206,6 +214,170 @@ func TestXSSProtection(t *testing.T) {
 			}
 			t.Logf("✅ XSS payload rejected: %s", logPayload)
 		})
+	}
+}
+
+func TestCryptoDecryptEndpointDisabled(t *testing.T) {
+	t.Setenv("ENABLE_CLIENT_DECRYPT_API", "")
+	t.Setenv("DATA_ENCRYPTION_KEY", "unit-test-key-please-change-1234567890")
+	auth.SetJWTSecret("test-secret")
+
+	server, _, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	body, _ := json.Marshal(map[string]string{
+		"wrappedKey": "",
+	})
+	req := httptest.NewRequest("POST", "/api/crypto/decrypt", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("Expected 404 when decrypt API disabled, got %d", w.Code)
+	}
+}
+
+func TestCryptoDecryptAADMismatch(t *testing.T) {
+	t.Setenv("ENABLE_CLIENT_DECRYPT_API", "true")
+	t.Setenv("DATA_ENCRYPTION_KEY", "unit-test-key-please-change-1234567890")
+	auth.SetJWTSecret("test-secret")
+
+	server, db, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	if server.cryptoHandler == nil || server.cryptoHandler.cryptoService == nil {
+		t.Skip("crypto service not available for test")
+	}
+
+	token := createTestJWTUser(t, db, "user-crypto", "user@example.com")
+	payload := encryptPayloadForTest(t, server, "another-user", "secret")
+
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest("POST", "/api/crypto/decrypt", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("Expected 403 for AAD mismatch, got %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestCryptoDecryptSuccess(t *testing.T) {
+	t.Setenv("ENABLE_CLIENT_DECRYPT_API", "true")
+	t.Setenv("DATA_ENCRYPTION_KEY", "unit-test-key-please-change-1234567890")
+	auth.SetJWTSecret("test-secret")
+
+	server, db, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	if server.cryptoHandler == nil || server.cryptoHandler.cryptoService == nil {
+		t.Skip("crypto service not available for test")
+	}
+
+	userID := "user-success"
+	email := "success@example.com"
+	token := createTestJWTUser(t, db, userID, email)
+	payload := encryptPayloadForTest(t, server, userID, "sensitive-secret")
+
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest("POST", "/api/crypto/decrypt", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected 200, got %d (%s)", w.Code, w.Body.String())
+	}
+
+	var resp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("解析响应失败: %v", err)
+	}
+	if resp["plaintext"] != "sensitive-secret" {
+		t.Fatalf("解密結果不正確，得到 %q", resp["plaintext"])
+	}
+}
+
+func createTestJWTUser(t *testing.T, db *config.Database, userID, email string) string {
+	t.Helper()
+	user := &config.User{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: "hash",
+		OTPSecret:    "",
+		OTPVerified:  true,
+	}
+	if err := db.CreateUser(user); err != nil {
+		t.Fatalf("创建测试用户失败: %v", err)
+	}
+	token, err := auth.GenerateJWT(userID, email)
+	if err != nil {
+		t.Fatalf("生成 JWT 失败: %v", err)
+	}
+	return token
+}
+
+func encryptPayloadForTest(t *testing.T, server *Server, userID, plaintext string) crypto.EncryptedPayload {
+	t.Helper()
+
+	publicKeyPEM := server.cryptoHandler.cryptoService.GetPublicKeyPEM()
+	block, _ := pem.Decode([]byte(publicKeyPEM))
+	if block == nil {
+		t.Fatal("无法解析公钥 PEM")
+	}
+
+	pubKeyIface, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		t.Fatalf("解析公钥失败: %v", err)
+	}
+	pubKey, ok := pubKeyIface.(*rsa.PublicKey)
+	if !ok {
+		t.Fatal("公钥类型不正确")
+	}
+
+	aesKey := make([]byte, 32)
+	if _, err := rand.Read(aesKey); err != nil {
+		t.Fatalf("生成 AES Key 失败: %v", err)
+	}
+	iv := make([]byte, 12)
+	if _, err := rand.Read(iv); err != nil {
+		t.Fatalf("生成 IV 失败: %v", err)
+	}
+
+	aadBytes, _ := json.Marshal(crypto.AADData{
+		UserID:    userID,
+		SessionID: "session-test",
+		TS:        time.Now().Unix(),
+		Purpose:   "sensitive_data_encryption",
+	})
+
+	blockCipher, err := aes.NewCipher(aesKey)
+	if err != nil {
+		t.Fatalf("创建 AES cipher 失败: %v", err)
+	}
+	gcm, err := cipher.NewGCM(blockCipher)
+	if err != nil {
+		t.Fatalf("创建 GCM 失败: %v", err)
+	}
+	ciphertext := gcm.Seal(nil, iv, []byte(plaintext), aadBytes)
+
+	wrappedKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, aesKey, nil)
+	if err != nil {
+		t.Fatalf("加密 AES Key 失败: %v", err)
+	}
+
+	return crypto.EncryptedPayload{
+		WrappedKey: base64.RawURLEncoding.EncodeToString(wrappedKey),
+		IV:         base64.RawURLEncoding.EncodeToString(iv),
+		Ciphertext: base64.RawURLEncoding.EncodeToString(ciphertext),
+		AAD:        base64.RawURLEncoding.EncodeToString(aadBytes),
+		TS:         time.Now().Unix(),
 	}
 }
 

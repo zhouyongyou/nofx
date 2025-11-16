@@ -146,6 +146,7 @@ func TestPnLCalculationWithFees(t *testing.T) {
 			// Deduct only closing fee (opening fee already deducted from account balance)
 			feeRate := getTakerFeeRate(tt.exchange)
 			closeFee := tt.quantity * tt.closePrice * feeRate
+			totalFees := tt.quantity*tt.openPrice*feeRate + closeFee
 			pnl -= closeFee
 
 			// Check if PnL is within expected range (for floating point tolerance)

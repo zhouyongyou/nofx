@@ -1,10 +1,13 @@
 package config
 
 import (
-	"nofx/crypto"
 	"os"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
+
+	"nofx/crypto"
 )
 
 // TestUpdateExchange_EmptyValuesShouldNotOverwrite 测试空值不应覆盖现有数据
@@ -203,6 +206,111 @@ func TestUpdateExchange_NonEmptyValuesShouldUpdate(t *testing.T) {
 	}
 	if exchanges[0].HyperliquidWalletAddr != "0xNewWallet" {
 		t.Errorf("WalletAddr 未更新")
+	}
+}
+
+func TestEnsureDefaultUserCreatesRecord(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.db.Exec(`DELETE FROM users WHERE id = 'default'`)
+	if err != nil {
+		t.Fatalf("删除 default 用户失败: %v", err)
+	}
+
+	if err := db.ensureDefaultUser(); err != nil {
+		t.Fatalf("ensureDefaultUser 失败: %v", err)
+	}
+
+	var count int
+	if err := db.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = 'default'`).Scan(&count); err != nil {
+		t.Fatalf("查询 default 用户失败: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("预期 default 用户存在，实际 count=%d", count)
+	}
+}
+
+func TestGetCustomCoinsFromTradingSymbols(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	userID := "test-user-007"
+
+	modelID := createTestAIModel(t, db, userID, "test-model")
+	exchangeID := createTestExchange(t, db, userID, "binance-custom")
+
+	traders := []*TraderRecord{
+		{
+			ID:                   "trader-a",
+			UserID:               userID,
+			Name:                 "TraderA",
+			AIModelID:            modelID,
+			ExchangeID:           exchangeID,
+			InitialBalance:       1000,
+			ScanIntervalMinutes:  3,
+			IsRunning:            true,
+			BTCETHLeverage:       3,
+			AltcoinLeverage:      3,
+			TradingSymbols:       " BTCUSDT ,ethusdt,dogeusdt ",
+			SystemPromptTemplate: "default",
+			IsCrossMargin:        true,
+			TakerFeeRate:         0.0004,
+			MakerFeeRate:         0.0002,
+			OrderStrategy:        "market_only",
+			LimitPriceOffset:     -0.03,
+			LimitTimeoutSeconds:  60,
+			Timeframes:           "4h",
+		},
+		{
+			ID:                   "trader-b",
+			UserID:               userID,
+			Name:                 "TraderB",
+			AIModelID:            modelID,
+			ExchangeID:           exchangeID,
+			InitialBalance:       2000,
+			ScanIntervalMinutes:  3,
+			IsRunning:            true,
+			BTCETHLeverage:       3,
+			AltcoinLeverage:      3,
+			TradingSymbols:       "SOLUSDT,btcUSDT",
+			SystemPromptTemplate: "default",
+			IsCrossMargin:        true,
+			TakerFeeRate:         0.0004,
+			MakerFeeRate:         0.0002,
+			OrderStrategy:        "market_only",
+			LimitPriceOffset:     -0.03,
+			LimitTimeoutSeconds:  60,
+			Timeframes:           "4h",
+		},
+	}
+
+	for _, tr := range traders {
+		if err := db.CreateTrader(tr); err != nil {
+			t.Fatalf("创建 trader %s 失败: %v", tr.ID, err)
+		}
+	}
+
+	coins := db.GetCustomCoins()
+	expected := []string{"BTCUSDT", "DOGEUSDT", "ETHUSDT", "SOLUSDT"}
+	if !reflect.DeepEqual(coins, expected) {
+		t.Fatalf("自定义币种結果不正确，期望 %v，实际 %v", expected, coins)
+	}
+}
+
+func TestGetCustomCoinsFallbackToDefaults(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, err := db.db.Exec(`DELETE FROM traders`)
+	if err != nil {
+		t.Fatalf("清理 traders 失败: %v", err)
+	}
+
+	coins := db.GetCustomCoins()
+	expected := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT", "HYPEUSDT"}
+	if !reflect.DeepEqual(coins, expected) {
+		t.Fatalf("預設币种不符，期望 %v，实际 %v", expected, coins)
 	}
 }
 
@@ -581,11 +689,45 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 
 	cleanup := func() {
 		db.Close()
-		os.RemoveAll(tmpFile)
-		os.RemoveAll(rsaKeyPath)
 	}
 
 	return db, cleanup
+}
+
+func createTestAIModel(t *testing.T, db *Database, userID, modelID string) int {
+	t.Helper()
+	if err := db.CreateAIModel(userID, modelID, strings.ToUpper(modelID), "deepseek", true, "", ""); err != nil {
+		t.Fatalf("创建 AI 模型失败: %v", err)
+	}
+	models, err := db.GetAIModels(userID)
+	if err != nil {
+		t.Fatalf("获取 AI 模型失败: %v", err)
+	}
+	for _, m := range models {
+		if m.ModelID == modelID {
+			return m.ID
+		}
+	}
+	t.Fatalf("未找到 AI 模型: %s", modelID)
+	return 0
+}
+
+func createTestExchange(t *testing.T, db *Database, userID, exchangeID string) int {
+	t.Helper()
+	if err := db.CreateExchange(userID, exchangeID, "Binance Futures", "binance", true, "", "", false, "", "", "", ""); err != nil {
+		t.Fatalf("创建交易所失败: %v", err)
+	}
+	exchanges, err := db.GetExchanges(userID)
+	if err != nil {
+		t.Fatalf("获取交易所失败: %v", err)
+	}
+	for _, ex := range exchanges {
+		if ex.ExchangeID == exchangeID {
+			return ex.ID
+		}
+	}
+	t.Fatalf("未找到交易所: %s", exchangeID)
+	return 0
 }
 
 // TestWALModeEnabled 测试 WAL 模式是否启用
