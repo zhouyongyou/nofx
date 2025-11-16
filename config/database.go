@@ -387,6 +387,11 @@ func (d *Database) createTables() error {
 
 // initDefaultData 初始化默认数据
 func (d *Database) initDefaultData() error {
+	// 确保 default 用户存在（后续 AI 模型、交易所都依赖此外键）
+	if err := d.ensureDefaultUser(); err != nil {
+		return fmt.Errorf("初始化默认用户失败: %w", err)
+	}
+
 	// 初始化AI模型（使用default用户）
 	// 注意：遷移到自增 ID 後，需要使用 model_id 而不是 id
 	aiModels := []struct {
@@ -552,6 +557,26 @@ func (d *Database) initDefaultData() error {
 	}
 
 	return nil
+}
+
+// ensureDefaultUser 确保系统保留的 default 用户存在
+func (d *Database) ensureDefaultUser() error {
+	var count int
+	if err := d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = 'default'`).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+
+	user := &User{
+		ID:           "default",
+		Email:        "default@localhost",
+		PasswordHash: "",
+		OTPSecret:    "",
+		OTPVerified:  true,
+	}
+	return d.CreateUser(user)
 }
 
 // migrateExchangesTable 迁移exchanges表支持多用户
@@ -2463,17 +2488,17 @@ func (d *Database) checkDataIntegrity() error {
 // RecordTrade 記錄交易事件到數據庫
 func (db *Database) RecordTrade(traderID, userID, symbol, side, action string, quantity, price float64, reason string, stopLoss, takeProfit, pnl, pnlPercent float64) error {
 	timestamp := time.Now().UnixMilli()
-	
+
 	query := `INSERT INTO trade_history 
 		(trader_id, user_id, symbol, side, action, quantity, price, timestamp, reason, stop_loss, take_profit, pnl, pnl_percent) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	
+
 	_, err := db.db.Exec(query, traderID, userID, symbol, side, action, quantity, price, timestamp, reason, stopLoss, takeProfit, pnl, pnlPercent)
 	if err != nil {
 		log.Printf("❌ 記錄交易事件失敗: %v", err)
 		return err
 	}
-	
+
 	log.Printf("✅ 記錄交易事件: %s %s %s %.4f @ %.2f", traderID, action, symbol, quantity, price)
 	return nil
 }
@@ -2483,20 +2508,20 @@ func (db *Database) SaveTraderState(traderID, userID string, callCount int, peak
 	query := `INSERT OR REPLACE INTO trader_state 
 		(trader_id, user_id, call_count, peak_equity, last_reset_time, state_json) 
 		VALUES (?, ?, ?, ?, ?, ?)`
-	
+
 	_, err := db.db.Exec(query, traderID, userID, callCount, peakEquity, lastResetTime, stateJSON)
 	if err != nil {
 		log.Printf("❌ 保存交易員狀態失敗: %v", err)
 		return err
 	}
-	
+
 	return nil
 }
 
 // LoadTraderState 從數據庫恢復交易員狀態
 func (db *Database) LoadTraderState(traderID string) (callCount int, peakEquity float64, lastResetTime int64, stateJSON string, err error) {
 	query := `SELECT call_count, peak_equity, last_reset_time, state_json FROM trader_state WHERE trader_id = ?`
-	
+
 	err = db.db.QueryRow(query, traderID).Scan(&callCount, &peakEquity, &lastResetTime, &stateJSON)
 	if err == sql.ErrNoRows {
 		// 沒有記錄，返回默認值
@@ -2506,7 +2531,7 @@ func (db *Database) LoadTraderState(traderID string) (callCount int, peakEquity 
 		log.Printf("❌ 加載交易員狀態失敗: %v", err)
 		return 0, 0, 0, "{}", err
 	}
-	
+
 	log.Printf("✅ 恢復交易員狀態: %s (調用次數: %d, 峰值淨值: %.2f)", traderID, callCount, peakEquity)
 	return callCount, peakEquity, lastResetTime, stateJSON, nil
 }
@@ -2526,25 +2551,25 @@ func (db *Database) GetOpenPositionsFromHistory(traderID string) (map[string]map
 		GROUP BY symbol, side
 		HAVING net_quantity > 0.0001
 	`
-	
+
 	rows, err := db.db.Query(query, traderID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	positions := make(map[string]map[string]interface{})
-	
+
 	for rows.Next() {
 		var symbol, side string
 		var netQuantity, avgPrice, stopLoss, takeProfit float64
 		var firstSeenTime int64
-		
+
 		err = rows.Scan(&symbol, &side, &netQuantity, &avgPrice, &stopLoss, &takeProfit, &firstSeenTime)
 		if err != nil {
 			continue
 		}
-		
+
 		key := symbol + "_" + side
 		positions[key] = map[string]interface{}{
 			"symbol":          symbol,
@@ -2556,10 +2581,99 @@ func (db *Database) GetOpenPositionsFromHistory(traderID string) (map[string]map
 			"first_seen_time": firstSeenTime,
 		}
 	}
-	
+
 	if len(positions) > 0 {
 		log.Printf("✅ 從數據庫恢復 %d 個持倉記錄", len(positions))
 	}
-	
+
 	return positions, nil
+}
+
+// GetLastOpenTrade 獲取最後一筆未配對的開倉記錄（用於計算 PnL）
+// 🔧 階段1修復#1: 解決 lastPositions 為空導致 PnL 計算錯誤
+func (db *Database) GetLastOpenTrade(traderID, symbol, side string) (entryPrice, quantity float64, err error) {
+	query := `
+		SELECT price, quantity
+		FROM trade_history
+		WHERE trader_id = ?
+		  AND symbol = ?
+		  AND side = ?
+		  AND action = 'OPEN'
+		  AND id NOT IN (
+			  -- 排除已配對的開倉記錄
+			  SELECT open_id FROM (
+				  SELECT
+					  o.id as open_id,
+					  ROW_NUMBER() OVER (PARTITION BY o.symbol, o.side ORDER BY o.timestamp, c.timestamp) as rn
+				  FROM trade_history o
+				  LEFT JOIN trade_history c
+					  ON c.trader_id = o.trader_id
+					  AND c.symbol = o.symbol
+					  AND c.side = o.side
+					  AND c.action IN ('CLOSE', 'PARTIAL_CLOSE', 'EMERGENCY_CLOSE', 'AUTO_CLOSE')
+					  AND c.timestamp > o.timestamp
+				  WHERE o.trader_id = ?
+					AND o.symbol = ?
+					AND o.side = ?
+					AND o.action = 'OPEN'
+					AND c.id IS NOT NULL
+			  )
+		  )
+		ORDER BY timestamp DESC
+		LIMIT 1
+	`
+
+	err = db.db.QueryRow(query, traderID, symbol, side, traderID, symbol, side).Scan(&entryPrice, &quantity)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, 0, fmt.Errorf("未找到未配對的開倉記錄: %s %s", symbol, side)
+		}
+		return 0, 0, err
+	}
+
+	return entryPrice, quantity, nil
+}
+
+// GetOpenPositions 獲取所有未平倉的持倉鍵值（用於同步檢測）
+// 🔧 階段1修復#4: 檢測交易所自動平倉
+func (db *Database) GetOpenPositions(traderID string) ([]string, error) {
+	query := `
+		SELECT DISTINCT symbol || '_' || side as position_key
+		FROM trade_history
+		WHERE trader_id = ?
+		  AND action = 'OPEN'
+		  AND id NOT IN (
+			  -- 排除已配對的開倉記錄
+			  SELECT open_id FROM (
+				  SELECT
+					  o.id as open_id
+				  FROM trade_history o
+				  INNER JOIN trade_history c
+					  ON c.trader_id = o.trader_id
+					  AND c.symbol = o.symbol
+					  AND c.side = o.side
+					  AND c.action IN ('CLOSE', 'PARTIAL_CLOSE', 'EMERGENCY_CLOSE', 'AUTO_CLOSE')
+					  AND c.timestamp > o.timestamp
+				  WHERE o.trader_id = ?
+					AND o.action = 'OPEN'
+			  )
+		  )
+	`
+
+	rows, err := db.db.Query(query, traderID, traderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+
+	return keys, nil
 }

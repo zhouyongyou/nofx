@@ -2574,6 +2574,7 @@ func (s *Server) handleCompleteRegistration(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"token":              tokenPair.AccessToken, // 向後兼容舊版前端
 		"access_token":       tokenPair.AccessToken,
 		"refresh_token":      tokenPair.RefreshToken,
 		"expires_in":         tokenPair.ExpiresIn,
@@ -2661,6 +2662,7 @@ func (s *Server) handleVerifyOTP(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"token":              tokenPair.AccessToken, // 向後兼容舊版前端
 		"access_token":       tokenPair.AccessToken,
 		"refresh_token":      tokenPair.RefreshToken,
 		"expires_in":         tokenPair.ExpiresIn,

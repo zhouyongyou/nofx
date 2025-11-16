@@ -404,6 +404,12 @@ func (at *AutoTrader) runCycle() error {
 	// 2. 重置日盈亏基线（每天一次）
 	at.maybeResetDailyMetrics()
 
+	// 🔧 階段1修復#4: 同步交易所自動平倉（檢測數據庫與交易所不一致）
+	if err := at.syncAutoClosedPositions(); err != nil {
+		log.Printf("⚠️ 同步交易所狀態失敗: %v", err)
+		// 不返回錯誤，繼續執行交易週期
+	}
+
 	// 4. 收集交易上下文
 	ctx, err := at.buildTradingContext()
 	if err != nil {
@@ -1202,13 +1208,34 @@ func (at *AutoTrader) executeCloseLongWithRecord(decision *decision.Decision, ac
 	}
 	actionRecord.Price = marketData.CurrentPrice
 
-	// 🔧 P0修復：平倉前獲取持倉信息以計算 PnL
+	// 🔧 階段1修復#1: 優先從數據庫獲取持倉信息（避免內存為空）
 	posKey := decision.Symbol + "_long"
 	var entryPrice float64 = 0
 	var quantity float64 = 0
-	if lastPos, exists := at.lastPositions[posKey]; exists {
-		entryPrice = lastPos.EntryPrice
-		quantity = lastPos.Quantity
+
+	// 方案 1: 從數據庫查詢（最可靠）
+	if db, ok := at.database.(interface {
+		GetLastOpenTrade(string, string, string) (float64, float64, error)
+	}); ok {
+		dbEntryPrice, dbQuantity, err := db.GetLastOpenTrade(at.config.ID, decision.Symbol, "LONG")
+		if err == nil {
+			entryPrice = dbEntryPrice
+			quantity = dbQuantity
+			log.Printf("  📊 從數據庫獲取入場價: %.2f, 數量: %.4f", entryPrice, quantity)
+		} else {
+			log.Printf("  ⚠️ 數據庫查詢失敗，嘗試內存備份: %v", err)
+		}
+	}
+
+	// 方案 2: Fallback 到內存（如果數據庫失敗）
+	if entryPrice == 0 {
+		if lastPos, exists := at.lastPositions[posKey]; exists {
+			entryPrice = lastPos.EntryPrice
+			quantity = lastPos.Quantity
+			log.Printf("  📊 從內存獲取入場價: %.2f, 數量: %.4f", entryPrice, quantity)
+		} else {
+			log.Printf("  ⚠️ 無法獲取入場價，PnL 將設為 0")
+		}
 	}
 
 	// 平仓
@@ -1275,13 +1302,34 @@ func (at *AutoTrader) executeCloseShortWithRecord(decision *decision.Decision, a
 	}
 	actionRecord.Price = marketData.CurrentPrice
 
-	// 🔧 P0修復：平倉前獲取持倉信息以計算 PnL
+	// 🔧 階段1修復#1: 優先從數據庫獲取持倉信息（避免內存為空）
 	posKey := decision.Symbol + "_short"
 	var entryPrice float64 = 0
 	var quantity float64 = 0
-	if lastPos, exists := at.lastPositions[posKey]; exists {
-		entryPrice = lastPos.EntryPrice
-		quantity = lastPos.Quantity
+
+	// 方案 1: 從數據庫查詢（最可靠）
+	if db, ok := at.database.(interface {
+		GetLastOpenTrade(string, string, string) (float64, float64, error)
+	}); ok {
+		dbEntryPrice, dbQuantity, err := db.GetLastOpenTrade(at.config.ID, decision.Symbol, "SHORT")
+		if err == nil {
+			entryPrice = dbEntryPrice
+			quantity = dbQuantity
+			log.Printf("  📊 從數據庫獲取入場價: %.2f, 數量: %.4f", entryPrice, quantity)
+		} else {
+			log.Printf("  ⚠️ 數據庫查詢失敗，嘗試內存備份: %v", err)
+		}
+	}
+
+	// 方案 2: Fallback 到內存（如果數據庫失敗）
+	if entryPrice == 0 {
+		if lastPos, exists := at.lastPositions[posKey]; exists {
+			entryPrice = lastPos.EntryPrice
+			quantity = lastPos.Quantity
+			log.Printf("  📊 從內存獲取入場價: %.2f, 數量: %.4f", entryPrice, quantity)
+		} else {
+			log.Printf("  ⚠️ 無法獲取入場價，PnL 將設為 0")
+		}
 	}
 
 	// 平仓
@@ -1683,6 +1731,56 @@ func (at *AutoTrader) executePartialCloseWithRecord(decision *decision.Decision,
 
 	log.Printf("  ✓ 部分平仓成功: 平仓 %.4f (%.1f%%), 剩余 %.4f",
 		closeQuantity, decision.ClosePercentage, remainingQuantity)
+
+	// 🔧 階段1修復#2: 記錄部分平倉到數據庫
+	if db, ok := at.database.(interface {
+		GetLastOpenTrade(string, string, string) (float64, float64, error)
+		RecordTrade(string, string, string, string, string, float64, float64, string, float64, float64, float64, float64) error
+	}); ok {
+		// 從數據庫獲取入場價
+		entryPrice, _, err := db.GetLastOpenTrade(at.config.ID, decision.Symbol, positionSide)
+		if err != nil {
+			// Fallback 到內存
+			posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
+			if lastPos, exists := at.lastPositions[posKey]; exists {
+				entryPrice = lastPos.EntryPrice
+			}
+		}
+
+		// 計算部分平倉的 PnL
+		var partialPnL, partialPnLPct float64
+		if entryPrice > 0 && closeQuantity > 0 {
+			if positionSide == "LONG" {
+				partialPnL = (marketData.CurrentPrice - entryPrice) * closeQuantity
+				partialPnLPct = ((marketData.CurrentPrice - entryPrice) / entryPrice) * 100
+			} else {
+				partialPnL = (entryPrice - marketData.CurrentPrice) * closeQuantity
+				partialPnLPct = ((entryPrice - marketData.CurrentPrice) / entryPrice) * 100
+			}
+		}
+
+		// 記錄到數據庫
+		reason := decision.Reasoning
+		if len(reason) > 500 {
+			reason = reason[:500]
+		}
+		if reason == "" {
+			reason = fmt.Sprintf("部分平倉 %.1f%%", decision.ClosePercentage)
+		}
+
+		if err := db.RecordTrade(
+			at.config.ID, at.userID, decision.Symbol,
+			positionSide, "PARTIAL_CLOSE",
+			closeQuantity, marketData.CurrentPrice,
+			reason,
+			decision.NewStopLoss, decision.NewTakeProfit,
+			partialPnL, partialPnLPct,
+		); err != nil {
+			log.Printf("  ⚠️ 記錄部分平倉到數據庫失敗: %v", err)
+		} else if partialPnL != 0 {
+			log.Printf("  💰 部分平倉 PnL: %.2f USDT (%.2f%%)", partialPnL, partialPnLPct)
+		}
+	}
 
 	// ✅ Step 4: Restore TP/SL protection (prevent remaining position from being unprotected)
 	// IMPORTANT: Exchanges like Binance automatically cancel existing TP/SL orders after partial close (due to quantity mismatch)
@@ -2255,7 +2353,25 @@ func (at *AutoTrader) checkPositionDrawdown() {
 }
 
 // 紧急平仓函数
+// 🔧 階段1修復#3: 添加數據庫記錄
 func (at *AutoTrader) emergencyClosePosition(symbol, side string) error {
+	// 平倉前獲取持倉信息用於 PnL 計算
+	posKey := symbol + "_" + side
+	var entryPrice, quantity float64
+
+	// 從內存獲取持倉信息
+	if lastPos, exists := at.lastPositions[posKey]; exists {
+		entryPrice = lastPos.EntryPrice
+		quantity = lastPos.Quantity
+	}
+
+	// 獲取當前價格
+	marketData, err := market.Get(symbol, at.timeframes)
+	if err != nil {
+		log.Printf("⚠️ 獲取市場數據失敗: %v", err)
+	}
+	currentPrice := marketData.CurrentPrice
+
 	switch side {
 	case "long":
 		order, err := at.trader.CloseLong(symbol, 0) // 0 = 全部平仓
@@ -2263,12 +2379,42 @@ func (at *AutoTrader) emergencyClosePosition(symbol, side string) error {
 			return err
 		}
 		log.Printf("✅ 紧急平多仓成功，订单ID: %v", order["orderId"])
+
+		// 🔧 記錄緊急平倉到數據庫
+		if db, ok := at.database.(interface {
+			RecordTrade(string, string, string, string, string, float64, float64, string, float64, float64, float64, float64) error
+		}); ok {
+			pnl := (currentPrice - entryPrice) * quantity
+			pnlPct := ((currentPrice - entryPrice) / entryPrice) * 100
+
+			db.RecordTrade(
+				at.config.ID, at.userID, symbol, "LONG", "EMERGENCY_CLOSE",
+				quantity, currentPrice, "回撤觸發緊急平倉",
+				0, 0, pnl, pnlPct,
+			)
+		}
+
 	case "short":
 		order, err := at.trader.CloseShort(symbol, 0) // 0 = 全部平仓
 		if err != nil {
 			return err
 		}
 		log.Printf("✅ 紧急平空仓成功，订单ID: %v", order["orderId"])
+
+		// 🔧 記錄緊急平倉到數據庫
+		if db, ok := at.database.(interface {
+			RecordTrade(string, string, string, string, string, float64, float64, string, float64, float64, float64, float64) error
+		}); ok {
+			pnl := (entryPrice - currentPrice) * quantity
+			pnlPct := ((entryPrice - currentPrice) / entryPrice) * 100
+
+			db.RecordTrade(
+				at.config.ID, at.userID, symbol, "SHORT", "EMERGENCY_CLOSE",
+				quantity, currentPrice, "回撤觸發緊急平倉",
+				0, 0, pnl, pnlPct,
+			)
+		}
+
 	default:
 		return fmt.Errorf("未知的持仓方向: %s", side)
 	}
@@ -2511,6 +2657,96 @@ func (at *AutoTrader) reinitializeMCPClient() error {
 
 	log.Printf("🔧 [MCP] AI模型配置已重新初始化: Model=%s, Provider=%s, CustomURL=%s",
 		at.config.CustomModelName, at.config.AIModel, at.config.CustomAPIURL)
+
+	return nil
+}
+
+// syncAutoClosedPositions 同步交易所自動平倉（檢測止損/止盈/強平）
+// 🔧 階段1修復#4: 檢測數據庫顯示開倉但交易所實際已平倉的情況
+func (at *AutoTrader) syncAutoClosedPositions() error {
+	// 從數據庫獲取應該開倉的持倉
+	if db, ok := at.database.(interface {
+		GetOpenPositions(string) ([]string, error)
+		GetLastOpenTrade(string, string, string) (float64, float64, error)
+		RecordTrade(string, string, string, string, string, float64, float64, string, float64, float64, float64, float64) error
+	}); ok {
+		dbOpenKeys, err := db.GetOpenPositions(at.config.ID)
+		if err != nil {
+			return fmt.Errorf("獲取數據庫持倉失敗: %v", err)
+		}
+
+		// 如果數據庫沒有開倉記錄，直接返回
+		if len(dbOpenKeys) == 0 {
+			return nil
+		}
+
+		// 從交易所獲取實際持倉
+		exchangePositions, err := at.trader.GetPositions()
+		if err != nil {
+			return fmt.Errorf("獲取交易所持倉失敗: %v", err)
+		}
+
+		// 構建交易所持倉 key 集合
+		exchangeKeys := make(map[string]bool)
+		for _, pos := range exchangePositions {
+			symbol, _ := pos["symbol"].(string)
+			side, _ := pos["side"].(string)
+			key := symbol + "_" + side
+			exchangeKeys[key] = true
+		}
+
+		// 檢測數據庫有但交易所沒有的持倉（被自動平倉了）
+		for _, dbKey := range dbOpenKeys {
+			if !exchangeKeys[dbKey] {
+				// 解析 symbol 和 side
+				parts := strings.Split(dbKey, "_")
+				if len(parts) != 2 {
+					continue
+				}
+				symbol, side := parts[0], parts[1]
+
+				log.Printf("⚠️ 檢測到交易所自動平倉: %s %s（數據庫顯示開倉但交易所已平）", symbol, side)
+
+				// 獲取當前價格
+				marketData, err := market.Get(symbol, at.timeframes)
+				if err != nil {
+					log.Printf("⚠️ 獲取 %s 市場數據失敗: %v", symbol, err)
+					continue
+				}
+
+				// 從數據庫獲取開倉信息
+				entryPrice, quantity, err := db.GetLastOpenTrade(at.config.ID, symbol, strings.ToUpper(side))
+				if err != nil {
+					log.Printf("⚠️ 獲取 %s 開倉信息失敗: %v", symbol, err)
+					continue
+				}
+
+				// 計算 PnL
+				var pnl, pnlPct float64
+				if strings.ToUpper(side) == "LONG" {
+					pnl = (marketData.CurrentPrice - entryPrice) * quantity
+					pnlPct = ((marketData.CurrentPrice - entryPrice) / entryPrice) * 100
+				} else {
+					pnl = (entryPrice - marketData.CurrentPrice) * quantity
+					pnlPct = ((entryPrice - marketData.CurrentPrice) / entryPrice) * 100
+				}
+
+				// 記錄自動平倉事件
+				if err := db.RecordTrade(
+					at.config.ID, at.userID, symbol,
+					strings.ToUpper(side), "AUTO_CLOSE",
+					quantity, marketData.CurrentPrice,
+					"交易所自動平倉（止損/止盈/強平）",
+					0, 0, pnl, pnlPct,
+				); err != nil {
+					log.Printf("⚠️ 記錄自動平倉失敗: %v", err)
+				} else {
+					log.Printf("✅ 已補記錄自動平倉: %s %s, PnL: %.2f USDT (%.2f%%)",
+						symbol, strings.ToUpper(side), pnl, pnlPct)
+				}
+			}
+		}
+	}
 
 	return nil
 }
