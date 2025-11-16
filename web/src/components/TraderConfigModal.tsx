@@ -359,6 +359,8 @@ export function TraderConfigModal({
         maker_fee_rate: formData.maker_fee_rate, // 添加 Maker 费率
         timeframes: formData.timeframes, // 添加时间线选择
         order_strategy: formData.order_strategy, // 添加订单策略
+        limit_price_offset: formData.limit_price_offset, // 🔧 修复：添加限价偏移
+        limit_timeout_seconds: formData.limit_timeout_seconds, // 🔧 修复：添加限价超时
       }
 
       // 只在编辑模式时包含initial_balance（用于手动更新）
