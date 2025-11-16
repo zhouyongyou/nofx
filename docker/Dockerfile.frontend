@@ -15,9 +15,12 @@ FROM node:${NODE_VERSION} AS builder
 WORKDIR /build
 
 COPY web/package*.json ./
-RUN npm ci
+# 跳過 husky prepare script（Docker 不需要 git hooks）
+RUN npm ci --ignore-scripts
 
 COPY web/ ./
+# 設置 CI 環境變量（防止任何 git hooks 相關操作）
+ENV CI=true
 RUN npm run build
 
 # ──────────────────────────────────────────────────────────────
