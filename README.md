@@ -327,7 +327,7 @@ Open your browser and visit: **http://localhost:3000**
 ### 1. Environment Requirements
 
 - **Go 1.21+**
-- **Node.js 18+**
+- **Node.js 20+** (see `.nvmrc` for the exact tested version)
 - **TA-Lib** library (technical indicator calculation)
 
 #### Installing TA-Lib
@@ -364,6 +364,8 @@ cd web
 npm install
 cd ..
 ```
+
+> Git hooks (husky) are disabled by default during `npm install` to keep Docker builds fast. If you want the web repo hooks locally, run `HUSKY_INSTALL=1 npm install` inside `web/`.
 
 ### 4. Get AI API Keys
 

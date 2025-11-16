@@ -10,7 +10,7 @@
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
-    "prepare": "husky",
+    "prepare": "node ./scripts/prepare-husky.cjs",
     "test": "vitest run"
   },
   "dependencies": {
