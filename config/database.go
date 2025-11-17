@@ -340,6 +340,101 @@ func (d *Database) initDefaultData() error {
 	return nil
 }
 
+// ensureDefaultUser 确保系统保留的 default 用户存在
+// 實現三階段自動修復：檢查 → 插入 → 清理修復
+func (d *Database) ensureDefaultUser() error {
+	// 階段 1: 檢查是否存在
+	var exists int
+	err := d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = 'default'`).Scan(&exists)
+	if err != nil {
+		log.Printf("⚠️  檢查 default user 時出錯: %v (繼續嘗試創建)", err)
+	} else if exists > 0 {
+		log.Printf("✅ default user 已存在")
+		return nil
+	}
+
+	// 階段 2: 嘗試正常插入
+	_, err = d.db.Exec(`
+		INSERT OR IGNORE INTO users (id, email, password_hash, otp_secret, otp_verified)
+		VALUES ('default', 'default@system.local', '', '', 1)
+	`)
+	if err != nil {
+		log.Printf("⚠️  創建 default user 時出錯: %v (嘗試自動修復)", err)
+	} else {
+		// 驗證插入是否成功
+		err = d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = 'default'`).Scan(&exists)
+		if err == nil && exists > 0 {
+			log.Printf("✅ 已成功創建 default user")
+			return nil
+		}
+	}
+
+	// 階段 3: 自動修復（清理可能衝突的孤立數據）
+	log.Printf("🔧 檢測到數據庫完整性問題，開始自動修復...")
+
+	// 3.1 檢查是否有孤立的記錄（user_id='default' 但 user 不存在）
+	var orphanedModels, orphanedExchanges int
+	d.db.QueryRow(`
+		SELECT COUNT(*) FROM ai_models
+		WHERE user_id = 'default' AND NOT EXISTS (SELECT 1 FROM users WHERE id = 'default')
+	`).Scan(&orphanedModels)
+	d.db.QueryRow(`
+		SELECT COUNT(*) FROM exchanges
+		WHERE user_id = 'default' AND NOT EXISTS (SELECT 1 FROM users WHERE id = 'default')
+	`).Scan(&orphanedExchanges)
+
+	if orphanedModels > 0 || orphanedExchanges > 0 {
+		log.Printf("   📦 發現 %d 個孤立的 AI models, %d 個孤立的 exchanges", orphanedModels, orphanedExchanges)
+		log.Printf("   🧹 正在清理孤立數據...")
+
+		// 臨時關閉外鍵約束以進行清理
+		if _, err := d.db.Exec("PRAGMA foreign_keys=OFF"); err != nil {
+			log.Printf("⚠️  關閉外鍵約束失敗: %v", err)
+		}
+
+		// 清理孤立數據
+		if orphanedModels > 0 {
+			if _, err := d.db.Exec(`DELETE FROM ai_models WHERE user_id = 'default'`); err != nil {
+				log.Printf("⚠️  清理孤立 AI models 失敗: %v", err)
+			} else {
+				log.Printf("   ✅ 已清理 %d 個孤立的 AI models", orphanedModels)
+			}
+		}
+
+		if orphanedExchanges > 0 {
+			if _, err := d.db.Exec(`DELETE FROM exchanges WHERE user_id = 'default'`); err != nil {
+				log.Printf("⚠️  清理孤立 exchanges 失敗: %v", err)
+			} else {
+				log.Printf("   ✅ 已清理 %d 個孤立的 exchanges", orphanedExchanges)
+			}
+		}
+
+		// 重新開啟外鍵約束
+		if _, err := d.db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+			log.Printf("⚠️  重新開啟外鍵約束失敗: %v", err)
+		}
+	}
+
+	// 3.2 使用 INSERT OR REPLACE 強制創建 default user
+	_, err = d.db.Exec(`
+		INSERT OR REPLACE INTO users (id, email, password_hash, otp_secret, otp_verified)
+		VALUES ('default', 'default@system.local', '', '', 1)
+	`)
+	if err != nil {
+		return fmt.Errorf("❌ 自動修復失敗，無法創建 default user: %w\n"+
+			"   💡 手動修復：sqlite3 nofx.db \"INSERT INTO users (id, email, password_hash) VALUES ('default', 'default@system.local', '');\"", err)
+	}
+
+	// 3.3 最終驗證
+	err = d.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = 'default'`).Scan(&exists)
+	if err != nil || exists == 0 {
+		return fmt.Errorf("❌ default user 創建後驗證失敗")
+	}
+
+	log.Printf("✅ 自動修復成功！default user 已創建")
+	return nil
+}
+
 // migrateExchangesTable 迁移exchanges表支持多用户
 func (d *Database) migrateExchangesTable() error {
 	// 检查是否已经迁移过
