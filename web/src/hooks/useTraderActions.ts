@@ -134,7 +134,7 @@ export function useTraderActions({
     if (!editingTrader || !editingTrader.trader_id) return
 
     try {
-      const enabledModels = allModels?.filter((m) => m.enabled) || []
+      const enabledModels = allModels?.filter((m) => m.enabled && m.apiKey) || []
       const enabledExchanges =
         allExchanges?.filter((e) => {
           if (!e.enabled) return false
@@ -145,18 +145,24 @@ export function useTraderActions({
               e.asterUser &&
               e.asterUser.trim() !== '' &&
               e.asterSigner &&
-              e.asterSigner.trim() !== ''
+              e.asterSigner.trim() !== '' &&
+              e.asterPrivateKey &&
+              e.asterPrivateKey.trim() !== ''
             )
           }
 
-          // Hyperliquid 需要钱包地址
+          // Hyperliquid 只需要私钥（作为apiKey），钱包地址可自动生成
           if (e.id === 'hyperliquid') {
-            return (
-              e.hyperliquidWalletAddr && e.hyperliquidWalletAddr.trim() !== ''
-            )
+            return e.apiKey && e.apiKey.trim() !== ''
           }
 
-          return true
+          // Binance 等其他交易所需要 apiKey 和 secretKey
+          return (
+            e.apiKey &&
+            e.apiKey.trim() !== '' &&
+            e.secretKey &&
+            e.secretKey.trim() !== ''
+          )
         }) || []
 
       const model = enabledModels?.find((m) => m.id === data.ai_model_id)

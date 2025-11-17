@@ -31,21 +31,21 @@ export function ExchangesSection({
       </h3>
       <div className="space-y-2 md:space-y-3">
         {configuredExchanges.map((exchange) => {
-          const inUse = isExchangeInUse((exchange as any).exchange_id)
+          const inUse = isExchangeInUse(exchange.id)
           return (
             <div
-              key={(exchange as any).exchange_id}
+              key={exchange.id}
               className={`flex items-center justify-between p-2 md:p-3 rounded transition-all ${
                 inUse
                   ? 'cursor-not-allowed'
                   : 'cursor-pointer hover:bg-gray-700'
               }`}
               style={{ background: '#0B0E11', border: '1px solid #2B3139' }}
-              onClick={() => onExchangeClick((exchange as any).exchange_id)}
+              onClick={() => onExchangeClick(exchange.id)}
             >
               <div className="flex items-center gap-2 md:gap-3">
                 <div className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center flex-shrink-0">
-                  {getExchangeIcon((exchange as any).exchange_id, { width: 28, height: 28 })}
+                  {getExchangeIcon(exchange.id, { width: 28, height: 28 })}
                 </div>
                 <div className="min-w-0">
                   <div

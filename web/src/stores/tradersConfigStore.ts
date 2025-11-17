@@ -57,15 +57,22 @@ export const useTradersConfigStore = create<TradersConfigState>((set, get) => ({
 
   setAllExchanges: (exchanges) => {
     set({ allExchanges: exchanges })
-    // 更新 configuredExchanges
+    // 更新 configuredExchanges - 顯示任何有配置資料的交易所
     const configuredExchanges = exchanges.filter((e) => {
       if (e.id === 'aster') {
-        return e.asterUser && e.asterUser.trim() !== ''
+        return (
+          (e.asterUser && e.asterUser.trim() !== '') ||
+          (e.asterSigner && e.asterSigner.trim() !== '') ||
+          (e.asterPrivateKey && e.asterPrivateKey.trim() !== '')
+        )
       }
       if (e.id === 'hyperliquid') {
-        return e.hyperliquidWalletAddr && e.hyperliquidWalletAddr.trim() !== ''
+        return (
+          (e.apiKey && e.apiKey.trim() !== '') ||
+          (e.hyperliquidWalletAddr && e.hyperliquidWalletAddr.trim() !== '')
+        )
       }
-      // 修复: 添加 enabled 判断,与原始逻辑保持一致
+      // 其他交易所: 有 enabled 或有 API Key 即算已配置
       return e.enabled || (e.apiKey && e.apiKey.trim() !== '')
     })
     set({ configuredExchanges })
