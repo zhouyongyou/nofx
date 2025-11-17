@@ -35,10 +35,10 @@ export function ModelConfigModal({
   const [modelName, setModelName] = useState('')
 
   // 获取当前编辑的模型信息 - 编辑时从已配置的模型中查找,新建时从所有支持的模型中查找
-  // 注意：後端返回的是 model_id (如 "deepseek")，而不是數字 id
+  // 注意：後端返回的字段名是 id (如 "deepseek")
   const selectedModel = editingModelId
-    ? configuredModels?.find((m: any) => m.model_id === selectedModelId)
-    : allModels?.find((m: any) => m.model_id === selectedModelId)
+    ? configuredModels?.find((m: any) => m.id === selectedModelId)
+    : allModels?.find((m: any) => m.id === selectedModelId)
 
   // 如果是编辑现有模型,初始化API Key、Base URL和Model Name
   useEffect(() => {
@@ -66,7 +66,7 @@ export function ModelConfigModal({
 
   useEffect(() => {
     if (!editingModelId && !selectedModelId && availableModels.length > 0) {
-      setSelectedModelId((availableModels[0] as any).model_id)
+      setSelectedModelId((availableModels[0] as any).id)
     }
   }, [editingModelId, selectedModelId, availableModels])
 
@@ -127,7 +127,7 @@ export function ModelConfigModal({
                 >
                   <option value="">{t('pleaseSelectModel', language)}</option>
                   {availableModels.map((model: any) => (
-                    <option key={model.model_id} value={model.model_id}>
+                    <option key={model.id} value={model.id}>
                       {getShortName(model.name)} ({model.provider})
                     </option>
                   ))}
@@ -142,7 +142,7 @@ export function ModelConfigModal({
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 flex items-center justify-center">
-                    {getModelIcon(selectedModel.provider || (selectedModel as any).model_id, {
+                    {getModelIcon(selectedModel.provider || selectedModel.id, {
                       width: 32,
                       height: 32,
                     }) || (
@@ -150,7 +150,7 @@ export function ModelConfigModal({
                         className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
                         style={{
                           background:
-                            (selectedModel as any).model_id === 'deepseek'
+                            selectedModel.id === 'deepseek'
                               ? '#60a5fa'
                               : '#c084fc',
                           color: '#fff',
@@ -165,7 +165,7 @@ export function ModelConfigModal({
                       {getShortName(selectedModel.name)}
                     </div>
                     <div className="text-xs" style={{ color: '#848E9C' }}>
-                      {selectedModel.provider} • {(selectedModel as any).model_id}
+                      {selectedModel.provider} • {selectedModel.id}
                     </div>
                   </div>
                 </div>
