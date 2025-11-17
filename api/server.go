@@ -2768,7 +2768,20 @@ func (s *Server) handleGetSupportedModels(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, models)
+	// 转换为安全的响应结构，移除敏感信息
+	safeModels := make([]SafeModelConfig, len(models))
+	for i, model := range models {
+		safeModels[i] = SafeModelConfig{
+			ID:              model.ModelID, // 返回 model_id（例如 "deepseek"）而不是自增 ID
+			Name:            model.Name,
+			Provider:        model.Provider,
+			Enabled:         model.Enabled,
+			CustomAPIURL:    model.CustomAPIURL,
+			CustomModelName: model.CustomModelName,
+		}
+	}
+
+	c.JSON(http.StatusOK, safeModels)
 }
 
 // handleGetSupportedExchanges 获取系统支持的交易所列表
