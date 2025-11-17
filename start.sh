@@ -35,6 +35,113 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+generate_jwt_secret() {
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -base64 48 | tr -d '\n'
+    else
+        head -c 128 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 64
+    fi
+}
+
+ensure_jwt_secret_in_config() {
+    if [ ! -f "config.json" ]; then
+        return
+    fi
+    local current="" default="" secret tmp
+    if command -v jq >/dev/null 2>&1; then
+        current=$(jq -r '.jwt_secret // ""' config.json 2>/dev/null || echo "")
+        if [ -f "config.json.example" ]; then
+            default=$(jq -r '.jwt_secret // ""' config.json.example 2>/dev/null || echo "")
+        fi
+        if [ -z "$current" ] || { [ -n "$default" ] && [ "$current" = "$default" ]; }; then
+            secret=$(generate_jwt_secret)
+            tmp=$(mktemp)
+            jq --arg s "$secret" '.jwt_secret = $s' config.json > "$tmp" && mv "$tmp" config.json
+            print_success "已生成并写入 jwt_secret"
+        fi
+    else
+        secret=$(generate_jwt_secret)
+        tmp=$(mktemp)
+        sed -E "s/(\"jwt_secret\"[[:space:]]*:[[:space:]]*\")[^"]*(\")/\1${secret}\2/" config.json > "$tmp" && mv "$tmp" config.json
+        print_success "已生成并写入 jwt_secret"
+    fi
+}
+
+sync_env_jwt_secret() {
+    if [ ! -f "config.json" ]; then
+        return
+    fi
+    local secret=""
+    if command -v jq >/dev/null 2>&1; then
+        secret=$(jq -r '.jwt_secret // ""' config.json 2>/dev/null || echo "")
+    else
+        secret=$(grep -o '"jwt_secret"[[:space:]]*:[[:space:]]*"[^"]*"' config.json | sed -E 's/.*:\s*\"(.*)\"/\1/' )
+    fi
+    if [ -z "$secret" ]; then
+        return
+    fi
+    if [ -f ".env" ]; then
+        if grep -q '^JWT_SECRET=' .env; then
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s|^JWT_SECRET=.*|JWT_SECRET=${secret}|" .env
+            else
+                sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${secret}|" .env
+            fi
+        else
+            echo "JWT_SECRET=${secret}" >> .env
+        fi
+        chmod 600 .env 2>/dev/null || true
+        print_success "已同步 .env 中的 JWT_SECRET"
+    fi
+}
+
+detect_hardware() {
+    CPU_CORES=1
+    TOTAL_MEM_GB=1
+    if command -v nproc >/dev/null 2>&1; then
+        CPU_CORES=$(nproc)
+    elif command -v sysctl >/dev/null 2>&1; then
+        CPU_CORES=$(sysctl -n hw.ncpu 2>/dev/null || echo 1)
+    fi
+    if [ -r /proc/meminfo ]; then
+        TOTAL_MEM_GB=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo)
+    elif command -v sysctl >/dev/null 2>&1; then
+        TOTAL_MEM_GB=$(sysctl -n hw.memsize 2>/dev/null | awk '{printf "%d", $1/1024/1024/1024}')
+    fi
+    [ -z "$CPU_CORES" ] && CPU_CORES=1
+    [ -z "$TOTAL_MEM_GB" ] && TOTAL_MEM_GB=1
+}
+
+apply_resource_limits() {
+    detect_hardware
+    local backend_cpus frontend_cpus backend_mem frontend_mem half
+    if [ "$CPU_CORES" -ge 8 ]; then
+        backend_cpus=4
+    elif [ "$CPU_CORES" -ge 4 ]; then
+        backend_cpus=3
+    elif [ "$CPU_CORES" -ge 2 ]; then
+        backend_cpus=1.5
+    else
+        backend_cpus=1
+    fi
+    frontend_cpus=0.5
+    half=$((TOTAL_MEM_GB/2))
+    if [ "$half" -lt 1 ]; then
+        backend_mem=1g
+    elif [ "$half" -gt 8 ]; then
+        backend_mem=8g
+    else
+        backend_mem="${half}g"
+    fi
+    frontend_mem=256m
+    if docker ps --format '{{.Names}}' | grep -q '^nofx-trading$'; then
+        docker update --cpus "$backend_cpus" --memory "$backend_mem" nofx-trading >/dev/null 2>&1 || true
+    fi
+    if docker ps --format '{{.Names}}' | grep -q '^nofx-frontend$'; then
+        docker update --cpus "$frontend_cpus" --memory "$frontend_mem" nofx-frontend >/dev/null 2>&1 || true
+    fi
+    print_info "已根据硬件参数应用资源限额"
+}
 # ------------------------------------------------------------------------
 # Detection: Docker Compose Command (Backward Compatible)
 # ------------------------------------------------------------------------
@@ -344,6 +451,8 @@ start() {
         $COMPOSE_CMD up -d
     fi
 
+    apply_resource_limits
+
     print_success "服务已启动！"
     print_info "Web 界面: http://localhost:${NOFX_FRONTEND_PORT}"
     print_info "API 端点: http://localhost:${NOFX_BACKEND_PORT}"
@@ -476,6 +585,8 @@ main() {
             check_env
             check_encryption
             check_config
+            ensure_jwt_secret_in_config
+            sync_env_jwt_secret
             check_database
             start "$2"
             ;;
