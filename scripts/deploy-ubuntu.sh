@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
-  echo "需要使用 sudo 运行：sudo bash scripts/deploy-ubuntu.sh"
+  echo "需要使用 sudo 运行：sudo bash scripts/deploy-ubuntu.sh [--docker]"
   exit 1
 fi
 
@@ -12,6 +12,68 @@ FRONT_ROOT=/var/www/nofx
 ENV_FILE=$INSTALL_DIR/.env
 SERVICE_FILE=/etc/systemd/system/nofx.service
 SITE_FILE=/etc/nginx/sites-available/nofx.conf
+MODE=${1:-}
+
+if [ "$MODE" = "--docker" ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y ca-certificates curl gnupg rsync openssl
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+  . /etc/os-release
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
+  apt-get update -y
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  systemctl enable --now docker
+
+  mkdir -p "$INSTALL_DIR"
+  rsync -a --delete --exclude ".git" --exclude "node_modules" --exclude "web/node_modules" . "$INSTALL_DIR/"
+  cd "$INSTALL_DIR"
+
+  if [ -f .env.example ] && [ ! -f "$ENV_FILE" ]; then
+    cp .env.example "$ENV_FILE"
+  fi
+
+  DATA_KEY=$(openssl rand -base64 32)
+  JWT_KEY=$(openssl rand -base64 64)
+  sed -i "s|DATA_ENCRYPTION_KEY=.*|DATA_ENCRYPTION_KEY=$DATA_KEY|" "$ENV_FILE"
+  sed -i "s|# JWT_SECRET=|JWT_SECRET=$JWT_KEY|" "$ENV_FILE"
+  chmod 600 "$ENV_FILE"
+
+  mkdir -p secrets decision_logs prompts
+  if [ ! -f secrets/rsa_key ]; then
+    openssl genrsa -out secrets/rsa_key 2048
+    chmod 600 secrets/rsa_key
+  fi
+  if [ ! -f secrets/rsa_key.pub ]; then
+    openssl rsa -in secrets/rsa_key -pubout -out secrets/rsa_key.pub
+    chmod 644 secrets/rsa_key.pub
+  fi
+  if [ -f config.json.example ] && [ ! -f config.json ]; then
+    cp config.json.example config.json
+  fi
+  if [ ! -f config.db ]; then
+    install -m 600 /dev/null config.db
+  fi
+
+  docker compose up -d --build
+
+  FRONT_PORT=$(grep '^NOFX_FRONTEND_PORT=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2)
+  BACK_PORT=$(grep '^NOFX_BACKEND_PORT=' "$ENV_FILE" 2>/dev/null | cut -d'=' -f2)
+  FRONT_PORT=${FRONT_PORT:-3000}
+  BACK_PORT=${BACK_PORT:-8080}
+
+  sleep 5
+  curl -sf "http://127.0.0.1:${BACK_PORT}/api/health" >/dev/null || echo "Docker后端健康检查失败"
+  curl -sf "http://127.0.0.1:${FRONT_PORT}/health" >/dev/null || echo "Docker前端健康检查失败"
+  if command -v ufw >/dev/null 2>&1; then
+    ufw allow ${FRONT_PORT}/tcp || true
+    ufw allow ${BACK_PORT}/tcp || true
+  fi
+  echo "Docker部署完成：前端 http://服务器IP:${FRONT_PORT}/  后端 http://服务器IP:${BACK_PORT}/api/"
+  exit 0
+fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
