@@ -21,6 +21,11 @@ type Data struct {
 type OIData struct {
 	Latest  float64
 	Average float64
+
+	// 市場情緒數據（來自 Binance Futures API - 免費）
+	LongShortRatio          float64 // 全市場多空持倉人數比（>1 表示多頭占優）
+	TopTraderLongShortRatio float64 // 大戶多空持倉量比（>1 表示大戶做多）
+	Sentiment               string  // 市場情緒簡化標籤："bullish", "bearish", "neutral"
 }
 
 // IntradayData 日内数据(3分钟间隔)
@@ -156,4 +161,26 @@ var config = Config{
 		CheckInterval:     5 * time.Minute,
 	},
 	UpdateInterval: 60, // 1 minute
+}
+
+// MarketSentiment 市場情緒數據（來自免費 API）
+type MarketSentiment struct {
+	// VIX 恐慌指數（來源：Yahoo Finance API - 免費）
+	VIX            float64 // 當前 VIX 值
+	FearLevel      string  // 恐慌等級："low"(<15), "moderate"(15-20), "high"(20-30), "extreme"(>30)
+	Recommendation string  // 建議："normal", "cautious", "defensive", "avoid_new_positions"
+
+	// 美股狀態（來源：Alpha Vantage API - 免費）
+	USMarket *USMarketStatus // 美股狀態（僅在交易時段有意義）
+
+	// 更新時間
+	UpdatedAt time.Time
+}
+
+// USMarketStatus 美股市場狀態
+type USMarketStatus struct {
+	IsOpen      bool    // 是否在交易時段（美東時間 9:30-16:00）
+	SPXTrend    string  // S&P 500 趨勢："up", "down", "neutral"（基於 1 小時變化）
+	SPXChange1h float64 // S&P 500 過去 1 小時變化百分比
+	Warning     string  // 警告訊息（如大跌 >2%）
 }
