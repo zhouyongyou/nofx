@@ -458,20 +458,36 @@ func (l *DecisionLogger) AnalyzePerformance(lookbackCycles int) (*PerformanceAna
 			case "close_long", "close_short", "partial_close", "auto_close_long", "auto_close_short":
 				// 查找对应的开仓记录（可能来自预填充或当前窗口）
 				if openPos, exists := openPositions[posKey]; exists {
-					openPrice := openPos["openPrice"].(float64)
-					openTime := openPos["openTime"].(time.Time)
-					side := openPos["side"].(string)
-					quantity := openPos["quantity"].(float64)
-					leverage := openPos["leverage"].(int)
+					// 使用安全类型转换避免 panic
+					openPrice, err := safeFloat64(openPos, "openPrice")
+					if err != nil {
+						continue // 跳过无效数据
+					}
+					openTime, err := safeTime(openPos, "openTime")
+					if err != nil {
+						continue
+					}
+					side, err := safeString(openPos, "side")
+					if err != nil {
+						continue
+					}
+					quantity, err := safeFloat64(openPos, "quantity")
+					if err != nil {
+						continue
+					}
+					leverage, err := safeInt(openPos, "leverage")
+					if err != nil {
+						continue
+					}
 
 					// 🔧 BUG FIX：取得追蹤字段（若不存在則初始化）
-					remainingQty, _ := openPos["remainingQuantity"].(float64)
+					remainingQty := safeFloat64OrDefault(openPos, "remainingQuantity", 0)
 					if remainingQty == 0 {
 						remainingQty = quantity // 兼容舊數據（沒有 remainingQuantity 字段）
 					}
-					accumulatedPnL, _ := openPos["accumulatedPnL"].(float64)
-					partialCloseCount, _ := openPos["partialCloseCount"].(int)
-					partialCloseVolume, _ := openPos["partialCloseVolume"].(float64)
+					accumulatedPnL := safeFloat64OrDefault(openPos, "accumulatedPnL", 0)
+					partialCloseCount := safeIntOrDefault(openPos, "partialCloseCount", 0)
+					partialCloseVolume := safeFloat64OrDefault(openPos, "partialCloseVolume", 0)
 
 					// 对于 partial_close，使用实际平仓数量；否则使用剩余仓位数量
 					actualQuantity := remainingQty
