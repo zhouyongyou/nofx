@@ -188,7 +188,10 @@ func NewAsterTraderTestSuite(t *testing.T) *AsterTraderTestSuite {
 	}))
 
 	// 生成一个测试用的私钥
-	privateKey, _ := crypto.GenerateKey()
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate test private key: %v", err)
+	}
 
 	// 创建 mock trader，使用 mock server 的 URL
 	trader := &AsterTrader{
