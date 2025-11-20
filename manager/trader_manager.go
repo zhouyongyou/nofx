@@ -1141,3 +1141,32 @@ func (tm *TraderManager) AddTraderForTest(traderID string, t *trader.AutoTrader)
 	defer tm.mu.Unlock()
 	tm.traders[traderID] = t
 }
+
+// ReloadUserTraders 强制重新加载用户的所有交易员（用于配置更新后）
+func (tm *TraderManager) ReloadUserTraders(database *config.Database, userID string) error {
+	// 1. 获取数据库中的交易员列表
+	traders, err := database.GetTraders(userID)
+	if err != nil {
+		return fmt.Errorf("获取用户 %s 的交易员列表失败: %w", userID, err)
+	}
+
+	// 2. 移除内存中的这些交易员
+	tm.mu.Lock()
+	for _, t := range traders {
+		if oldTrader, exists := tm.traders[t.ID]; exists {
+			// 如果交易员正在运行，先停止它
+			status := oldTrader.GetStatus()
+			if isRunning, ok := status["is_running"].(bool); ok && isRunning {
+				oldTrader.Stop()
+				log.Printf("⏹  配置更新: 已停止并移除运行中的交易员 %s", t.Name)
+			} else {
+				log.Printf("🔄 配置更新: 已移除交易员实例 %s", t.Name)
+			}
+			delete(tm.traders, t.ID)
+		}
+	}
+	tm.mu.Unlock()
+
+	// 3. 重新加载（LoadUserTraders 会处理并发锁）
+	return tm.LoadUserTraders(database, userID)
+}
