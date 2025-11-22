@@ -3,7 +3,6 @@ package trader
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
