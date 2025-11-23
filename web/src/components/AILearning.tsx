@@ -74,13 +74,17 @@ export default function AILearning({ traderId }: AILearningProps) {
   )
 
   if (error) {
+    // 如果是 404 錯誤（trader 未運行），顯示友好提示而非錯誤
+    const is404 = error.message?.includes('404') || error.message?.includes('不存在')
     return (
       <div
         className="rounded p-6"
         style={{ background: '#1E2329', border: '1px solid #2B3139' }}
       >
-        <div style={{ color: '#F6465D' }}>
-          {stripLeadingIcons(t('loadingError', language))}
+        <div style={{ color: is404 ? '#848E9C' : '#F6465D' }}>
+          {is404
+            ? (language === 'zh' ? '启动交易后会显示 AI 学习数据' : 'AI learning data will appear after trading starts')
+            : stripLeadingIcons(t('loadingError', language))}
         </div>
       </div>
     )

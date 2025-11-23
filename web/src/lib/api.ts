@@ -107,26 +107,40 @@ export const api = {
   },
 
   async updateModelConfigs(request: UpdateModelConfigRequest): Promise<void> {
-    // 获取RSA公钥
-    const publicKey = await CryptoService.fetchPublicKey()
+    try {
+      // 获取RSA公钥
+      const publicKey = await CryptoService.fetchPublicKey()
 
-    // 初始化加密服务
-    await CryptoService.initialize(publicKey)
+      // 初始化加密服务
+      await CryptoService.initialize(publicKey)
 
-    // 获取用户信息（从localStorage或其他地方）
-    const userId = localStorage.getItem('user_id') || ''
-    const sessionId = sessionStorage.getItem('session_id') || ''
+      // 获取用户信息（从localStorage或其他地方）
+      const userId = localStorage.getItem('user_id') || ''
+      const sessionId = sessionStorage.getItem('session_id') || ''
 
-    // 加密敏感数据
-    const encryptedPayload = await CryptoService.encryptSensitiveData(
-      JSON.stringify(request),
-      userId,
-      sessionId
-    )
+      // 加密敏感数据
+      const encryptedPayload = await CryptoService.encryptSensitiveData(
+        JSON.stringify(request),
+        userId,
+        sessionId
+      )
 
-    // 发送加密数据
-    const result = await httpClient.put(`${API_BASE}/models`, encryptedPayload)
-    if (!result.success) throw new Error('更新模型配置失败')
+      // 发送加密数据
+      const result = await httpClient.put(`${API_BASE}/models`, encryptedPayload)
+      if (!result.success) {
+        // 使用服务器返回的具体错误信息
+        throw new Error(result.message || '更新模型配置失败')
+      }
+    } catch (error) {
+      // 区分加密错误和服务器错误
+      if (error instanceof Error) {
+        if (error.message.includes('Crypto') || error.message.includes('encrypt')) {
+          throw new Error('加密失败：请确保使用 HTTPS 或 localhost 访问')
+        }
+        throw error
+      }
+      throw new Error('更新模型配置失败')
+    }
   },
 
   // 交易所配置接口
@@ -156,29 +170,43 @@ export const api = {
   async updateExchangeConfigsEncrypted(
     request: UpdateExchangeConfigRequest
   ): Promise<void> {
-    // 获取RSA公钥
-    const publicKey = await CryptoService.fetchPublicKey()
+    try {
+      // 获取RSA公钥
+      const publicKey = await CryptoService.fetchPublicKey()
 
-    // 初始化加密服务
-    await CryptoService.initialize(publicKey)
+      // 初始化加密服务
+      await CryptoService.initialize(publicKey)
 
-    // 获取用户信息（从localStorage或其他地方）
-    const userId = localStorage.getItem('user_id') || ''
-    const sessionId = sessionStorage.getItem('session_id') || ''
+      // 获取用户信息（从localStorage或其他地方）
+      const userId = localStorage.getItem('user_id') || ''
+      const sessionId = sessionStorage.getItem('session_id') || ''
 
-    // 加密敏感数据
-    const encryptedPayload = await CryptoService.encryptSensitiveData(
-      JSON.stringify(request),
-      userId,
-      sessionId
-    )
+      // 加密敏感数据
+      const encryptedPayload = await CryptoService.encryptSensitiveData(
+        JSON.stringify(request),
+        userId,
+        sessionId
+      )
 
-    // 发送加密数据
-    const result = await httpClient.put(
-      `${API_BASE}/exchanges`,
-      encryptedPayload
-    )
-    if (!result.success) throw new Error('更新交易所配置失败')
+      // 发送加密数据
+      const result = await httpClient.put(
+        `${API_BASE}/exchanges`,
+        encryptedPayload
+      )
+      if (!result.success) {
+        // 使用服务器返回的具体错误信息
+        throw new Error(result.message || '更新交易所配置失败')
+      }
+    } catch (error) {
+      // 区分加密错误和服务器错误
+      if (error instanceof Error) {
+        if (error.message.includes('Crypto') || error.message.includes('encrypt')) {
+          throw new Error('加密失败：请确保使用 HTTPS 或 localhost 访问')
+        }
+        throw error
+      }
+      throw new Error('更新交易所配置失败')
+    }
   },
 
   // 获取系统状态（支持trader_id）

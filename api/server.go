@@ -1013,7 +1013,14 @@ func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 	decrypted, err := s.cryptoHandler.cryptoService.DecryptSensitiveData(&encryptedPayload)
 	if err != nil {
 		log.Printf("❌ 解密模型配置失败 (UserID: %s): %v", userID, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "解密数据失败"})
+		// 根据错误类型提供更具体的错误信息
+		errMsg := "解密数据失败"
+		if strings.Contains(err.Error(), "timestamp") {
+			errMsg = "时间戳验证失败：请检查系统时间是否正确"
+		} else if strings.Contains(err.Error(), "unwrap") || strings.Contains(err.Error(), "RSA") {
+			errMsg = "密钥解密失败：请刷新页面重试"
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
 
@@ -1110,7 +1117,14 @@ func (s *Server) handleUpdateExchangeConfigs(c *gin.Context) {
 	decrypted, err := s.cryptoHandler.cryptoService.DecryptSensitiveData(&encryptedPayload)
 	if err != nil {
 		log.Printf("❌ 解密交易所配置失败 (UserID: %s): %v", userID, err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "解密数据失败"})
+		// 根据错误类型提供更具体的错误信息
+		errMsg := "解密数据失败"
+		if strings.Contains(err.Error(), "timestamp") {
+			errMsg = "时间戳验证失败：请检查系统时间是否正确"
+		} else if strings.Contains(err.Error(), "unwrap") || strings.Contains(err.Error(), "RSA") {
+			errMsg = "密钥解密失败：请刷新页面重试"
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
 
