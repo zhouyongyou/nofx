@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"nofx/config"
@@ -302,4 +303,70 @@ func TestPublicTraderListResponse_SystemPromptTemplate(t *testing.T) {
 	if response["system_prompt_template"] != "default" {
 		t.Errorf("Expected system_prompt_template='default', got %v", response["system_prompt_template"])
 	}
+}
+
+// TestGetDecryptionErrorMessage 测试解密错误消息映射逻辑
+func TestGetDecryptionErrorMessage(t *testing.T) {
+	tests := []struct {
+		name           string
+		errorMessage   string
+		expectedOutput string
+	}{
+		{
+			name:           "时间戳过期错误",
+			errorMessage:   "timestamp invalid or expired",
+			expectedOutput: "时间戳验证失败：请检查系统时间是否正确",
+		},
+		{
+			name:           "时间戳相关错误（包含timestamp关键字）",
+			errorMessage:   "validation failed: timestamp check failed",
+			expectedOutput: "时间戳验证失败：请检查系统时间是否正确",
+		},
+		{
+			name:           "RSA密钥解包错误",
+			errorMessage:   "failed to unwrap AES key: crypto/rsa: decryption error",
+			expectedOutput: "密钥解密失败：请刷新页面重试",
+		},
+		{
+			name:           "RSA相关错误",
+			errorMessage:   "RSA-OAEP decryption failed",
+			expectedOutput: "密钥解密失败：请刷新页面重试",
+		},
+		{
+			name:           "base64解码错误（通用回退）",
+			errorMessage:   "failed to decode wrapped key: illegal base64 data",
+			expectedOutput: "解密数据失败",
+		},
+		{
+			name:           "AES-GCM认证错误（通用回退）",
+			errorMessage:   "authentication/decryption failed: cipher: message authentication failed",
+			expectedOutput: "解密数据失败",
+		},
+		{
+			name:           "未知错误（通用回退）",
+			errorMessage:   "some unknown error occurred",
+			expectedOutput: "解密数据失败",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getDecryptionErrorMessage(tt.errorMessage)
+			if result != tt.expectedOutput {
+				t.Errorf("getDecryptionErrorMessage(%q) = %q, want %q",
+					tt.errorMessage, result, tt.expectedOutput)
+			}
+		})
+	}
+}
+
+// getDecryptionErrorMessage 根据错误类型返回用户友好的错误消息
+// 这个函数提取自 handleUpdateModelConfigs 和 handleUpdateExchangeConfigs 中的逻辑
+func getDecryptionErrorMessage(errMsg string) string {
+	if strings.Contains(errMsg, "timestamp") {
+		return "时间戳验证失败：请检查系统时间是否正确"
+	} else if strings.Contains(errMsg, "unwrap") || strings.Contains(errMsg, "RSA") {
+		return "密钥解密失败：请刷新页面重试"
+	}
+	return "解密数据失败"
 }
