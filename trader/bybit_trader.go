@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,6 +12,22 @@ import (
 
 	bybit "github.com/bybit-exchange/bybit.go.api"
 )
+
+// Bybit Broker ID (用於返傭追蹤)
+const BybitBrokerID = "Up000938"
+
+// bybitBrokerTransport 自定義 HTTP Transport，自動添加 Referer header
+type bybitBrokerTransport struct {
+	base    http.RoundTripper
+	referer string
+}
+
+// RoundTrip 實現 http.RoundTripper 接口
+func (t *bybitBrokerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// 添加 Referer header 用於 Broker 追蹤
+	req.Header.Set("Referer", t.referer)
+	return t.base.RoundTrip(req)
+}
 
 // BybitTrader Bybit USDT 永續合約交易器
 type BybitTrader struct {
@@ -34,12 +51,21 @@ type BybitTrader struct {
 func NewBybitTrader(apiKey, secretKey string) *BybitTrader {
 	client := bybit.NewBybitHttpClient(apiKey, secretKey, bybit.WithBaseURL(bybit.MAINNET))
 
+	// 設置自定義 HTTP Client，添加 Broker Referer header
+	client.HTTPClient = &http.Client{
+		Transport: &bybitBrokerTransport{
+			base:    http.DefaultTransport,
+			referer: BybitBrokerID,
+		},
+		Timeout: 30 * time.Second,
+	}
+
 	trader := &BybitTrader{
 		client:        client,
 		cacheDuration: 15 * time.Second,
 	}
 
-	log.Printf("🔵 [Bybit] 交易器已初始化")
+	log.Printf("🔵 [Bybit] 交易器已初始化 (Broker ID: %s)", BybitBrokerID)
 
 	return trader
 }
