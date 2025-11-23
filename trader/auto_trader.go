@@ -111,6 +111,8 @@ type AutoTrader struct {
 	peakPnLCache          map[string]float64 // 最高收益缓存 (symbol -> 峰值盈亏百分比)
 	peakPnLCacheMutex     sync.RWMutex       // 缓存读写锁
 	lastBalanceSyncTime   time.Time          // 上次余额同步时间
+	positionStopLoss      map[string]float64 // 持仓止损价格缓存 (symbol_side -> 止损价)
+	positionTakeProfit    map[string]float64 // 持仓止盈价格缓存 (symbol_side -> 止盈价)
 	database              interface{}        // 数据库引用（用于自动更新余额）
 	userID                string             // 用户ID
 }
@@ -262,6 +264,8 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		peakPnLCache:          make(map[string]float64),
 		peakPnLCacheMutex:     sync.RWMutex{},
 		lastBalanceSyncTime:   time.Now(), // 初始化为当前时间
+		positionStopLoss:      make(map[string]float64),
+		positionTakeProfit:    make(map[string]float64),
 		database:              database,
 		userID:                userID,
 	}, nil
@@ -999,8 +1003,13 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 		log.Printf("  🚨 建议：手动平掉其中一个方向的持仓，或检查系统是否有BUG")
 	}
 
-	// 取消旧的止损单（只删除止损单，不影响止盈单）
-	// 注意：如果存在双向持仓，这会删除两个方向的止损单
+	// ⚠️ Save-Restore Pattern: 保存当前止盈价格，因为 Hyperliquid
+	// 取消止损时会连带取消所有挂单（包括止盈），需要在设置新止损后恢复止盈
+	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
+	savedTakeProfit := at.positionTakeProfit[posKey]
+
+	// 取消旧的止损单
+	// 注意：Hyperliquid 会删除所有挂单，但我们会在后面恢复止盈
 	if err := at.trader.CancelStopLossOrders(decision.Symbol); err != nil {
 		log.Printf("  ⚠ 取消旧止损单失败: %v", err)
 		// 不中断执行，继续设置新止损
@@ -1014,6 +1023,21 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 	}
 
 	log.Printf("  ✓ 止损已调整: %.2f (当前价格: %.2f)", decision.NewStopLoss, marketData.CurrentPrice)
+
+	// 更新内存中的止损价格
+	at.positionStopLoss[posKey] = decision.NewStopLoss
+
+	// ⚠️ Save-Restore: 仅 Hyperliquid 需要恢复被误删的止盈单
+	// 因为 Hyperliquid 的 CancelStopLossOrders 会删除所有挂单（包括止盈）
+	if at.exchange == "hyperliquid" && savedTakeProfit > 0 {
+		log.Printf("  🔄 [Hyperliquid Restore] 检测到止盈单被误删，正在恢复止盈: %.2f", savedTakeProfit)
+		if err := at.trader.SetTakeProfit(decision.Symbol, positionSide, quantity, savedTakeProfit); err != nil {
+			log.Printf("  ⚠️ [Restore] 恢复止盈单失败: %v（止盈可能丢失，请检查）", err)
+		} else {
+			log.Printf("  ✓ [Restore] 止盈单已恢复: %.2f", savedTakeProfit)
+		}
+	}
+
 	return nil
 }
 
@@ -1083,8 +1107,13 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 		log.Printf("  🚨 建议：手动平掉其中一个方向的持仓，或检查系统是否有BUG")
 	}
 
-	// 取消旧的止盈单（只删除止盈单，不影响止损单）
-	// 注意：如果存在双向持仓，这会删除两个方向的止盈单
+	// ⚠️ Save-Restore Pattern: 保存当前止损价格，因为 Hyperliquid
+	// 取消止盈时会连带取消所有挂单（包括止损），需要在设置新止盈后恢复止损
+	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
+	savedStopLoss := at.positionStopLoss[posKey]
+
+	// 取消旧的止盈单
+	// 注意：Hyperliquid 会删除所有挂单，但我们会在后面恢复止损
 	if err := at.trader.CancelTakeProfitOrders(decision.Symbol); err != nil {
 		log.Printf("  ⚠ 取消旧止盈单失败: %v", err)
 		// 不中断执行，继续设置新止盈
@@ -1098,6 +1127,21 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	}
 
 	log.Printf("  ✓ 止盈已调整: %.2f (当前价格: %.2f)", decision.NewTakeProfit, marketData.CurrentPrice)
+
+	// 更新内存中的止盈价格
+	at.positionTakeProfit[posKey] = decision.NewTakeProfit
+
+	// ⚠️ Save-Restore: 仅 Hyperliquid 需要恢复被误删的止损单
+	// 因为 Hyperliquid 的 CancelTakeProfitOrders 会删除所有挂单（包括止损）
+	if at.exchange == "hyperliquid" && savedStopLoss > 0 {
+		log.Printf("  🔄 [Hyperliquid Restore] 检测到止损单被误删，正在恢复止损: %.2f", savedStopLoss)
+		if err := at.trader.SetStopLoss(decision.Symbol, positionSide, quantity, savedStopLoss); err != nil {
+			log.Printf("  ⚠️ [Restore] 恢复止损单失败: %v（止损可能丢失，请检查）", err)
+		} else {
+			log.Printf("  ✓ [Restore] 止损单已恢复: %.2f", savedStopLoss)
+		}
+	}
+
 	return nil
 }
 
