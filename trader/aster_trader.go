@@ -1019,12 +1019,21 @@ func (t *AsterTrader) SetStopLoss(symbol string, positionSide string, quantity, 
 	priceStr := t.formatFloatWithPrecision(formattedPrice, prec.PricePrecision)
 	qtyStr := t.formatFloatWithPrecision(formattedQty, prec.QuantityPrecision)
 
+	// 计算并格式化 Stop Limit Price
+	limitPrice := CalculateStopLimitPrice(positionSide, stopPrice, 0)
+	formattedLimitPrice, err := t.formatPrice(symbol, limitPrice)
+	if err != nil {
+		return err
+	}
+	limitPriceStr := t.formatFloatWithPrecision(formattedLimitPrice, prec.PricePrecision)
+
 	params := map[string]interface{}{
 		"symbol":       symbol,
 		"positionSide": "BOTH",
-		"type":         "STOP_MARKET",
+		"type":         "STOP",
 		"side":         side,
 		"stopPrice":    priceStr,
+		"price":        limitPriceStr,
 		"quantity":     qtyStr,
 		"timeInForce":  "GTC",
 	}
@@ -1060,12 +1069,21 @@ func (t *AsterTrader) SetTakeProfit(symbol string, positionSide string, quantity
 	priceStr := t.formatFloatWithPrecision(formattedPrice, prec.PricePrecision)
 	qtyStr := t.formatFloatWithPrecision(formattedQty, prec.QuantityPrecision)
 
+	// 计算并格式化 Stop Limit Price (TP)
+	limitPrice := CalculateStopLimitPrice(positionSide, takeProfitPrice, 0)
+	formattedLimitPrice, err := t.formatPrice(symbol, limitPrice)
+	if err != nil {
+		return err
+	}
+	limitPriceStr := t.formatFloatWithPrecision(formattedLimitPrice, prec.PricePrecision)
+
 	params := map[string]interface{}{
 		"symbol":       symbol,
 		"positionSide": "BOTH",
-		"type":         "TAKE_PROFIT_MARKET",
+		"type":         "TAKE_PROFIT",
 		"side":         side,
 		"stopPrice":    priceStr,
+		"price":        limitPriceStr,
 		"quantity":     qtyStr,
 		"timeInForce":  "GTC",
 	}

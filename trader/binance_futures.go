@@ -749,11 +749,15 @@ func (t *FuturesTrader) SetStopLoss(symbol string, positionSide string, quantity
 		return err
 	}
 
+	// 计算 Stop Limit Price
+	limitPrice := CalculateStopLimitPrice(positionSide, stopPrice, 0)
+
 	_, err = t.client.NewCreateOrderService().
 		Symbol(symbol).
 		Side(side).
 		PositionSide(posSide).
-		Type(futures.OrderTypeStopMarket).
+		Type(futures.OrderTypeStop).
+		Price(fmt.Sprintf("%.8f", limitPrice)).
 		StopPrice(fmt.Sprintf("%.8f", stopPrice)).
 		Quantity(quantityStr).
 		WorkingType(futures.WorkingTypeContractPrice).
@@ -787,11 +791,15 @@ func (t *FuturesTrader) SetTakeProfit(symbol string, positionSide string, quanti
 		return err
 	}
 
+	// 计算 Stop Limit Price (Take Profit 也使用相同的逻辑确保成交)
+	limitPrice := CalculateStopLimitPrice(positionSide, takeProfitPrice, 0)
+
 	_, err = t.client.NewCreateOrderService().
 		Symbol(symbol).
 		Side(side).
 		PositionSide(posSide).
-		Type(futures.OrderTypeTakeProfitMarket).
+		Type(futures.OrderTypeTakeProfit).
+		Price(fmt.Sprintf("%.8f", limitPrice)).
 		StopPrice(fmt.Sprintf("%.8f", takeProfitPrice)).
 		Quantity(quantityStr).
 		WorkingType(futures.WorkingTypeContractPrice).

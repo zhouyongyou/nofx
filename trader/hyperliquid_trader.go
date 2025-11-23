@@ -751,16 +751,20 @@ func (t *HyperliquidTrader) SetStopLoss(symbol string, positionSide string, quan
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	roundedStopPrice := t.roundPriceToSigfigs(stopPrice)
 
+	// 计算 Stop Limit Price
+	limitPrice := CalculateStopLimitPrice(positionSide, stopPrice, 0)
+	roundedLimitPrice := t.roundPriceToSigfigs(limitPrice)
+
 	// 创建止损单（Trigger Order）
 	order := hyperliquid.CreateOrderRequest{
 		Coin:  coin,
 		IsBuy: isBuy,
-		Size:  roundedQuantity,  // 使用四舍五入后的数量
-		Price: roundedStopPrice, // 使用处理后的价格
+		Size:  roundedQuantity,   // 使用四舍五入后的数量
+		Price: roundedLimitPrice, // 使用 Stop Limit 价格
 		OrderType: hyperliquid.OrderType{
 			Trigger: &hyperliquid.TriggerOrderType{
 				TriggerPx: roundedStopPrice,
-				IsMarket:  true,
+				IsMarket:  false,
 				Tpsl:      "sl", // stop loss
 			},
 		},
@@ -788,16 +792,20 @@ func (t *HyperliquidTrader) SetTakeProfit(symbol string, positionSide string, qu
 	// ⚠️ 关键：价格也需要处理为5位有效数字
 	roundedTakeProfitPrice := t.roundPriceToSigfigs(takeProfitPrice)
 
+	// 计算 Stop Limit Price (TP)
+	limitPrice := CalculateStopLimitPrice(positionSide, takeProfitPrice, 0)
+	roundedLimitPrice := t.roundPriceToSigfigs(limitPrice)
+
 	// 创建止盈单（Trigger Order）
 	order := hyperliquid.CreateOrderRequest{
 		Coin:  coin,
 		IsBuy: isBuy,
-		Size:  roundedQuantity,        // 使用四舍五入后的数量
-		Price: roundedTakeProfitPrice, // 使用处理后的价格
+		Size:  roundedQuantity,   // 使用四舍五入后的数量
+		Price: roundedLimitPrice, // 使用 Stop Limit 价格
 		OrderType: hyperliquid.OrderType{
 			Trigger: &hyperliquid.TriggerOrderType{
 				TriggerPx: roundedTakeProfitPrice,
-				IsMarket:  true,
+				IsMarket:  false,
 				Tpsl:      "tp", // take profit
 			},
 		},
