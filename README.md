@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Backed by Amber.ac](https://img.shields.io/badge/Backed%20by-Amber.ac-orange.svg)](https://amber.ac)
 
-**Languages:** [English](README.md) | [中文](docs/i18n/zh-CN/README.md) | [Українська](docs/i18n/uk/README.md) | [Русский](docs/i18n/ru/README.md) | [日本語](docs/i18n/ja/README.md)
+**Languages:** [English](README.md) | [中文](docs/i18n/zh-CN/README.md) | [Українська](docs/i18n/uk/README.md) | [Русский](docs/i18n/ru/README.md) | [日本語](docs/i18n/ja/README.md) | [한국어](docs/i18n/ko/README.md)
 
 **📚 Documentation:** [Docs Home](docs/README.md) | [Getting Started](docs/getting-started/README.md) | [Prompt Writing Guide](docs/prompt-guide.md) ([中文](docs/prompt-guide.zh-CN.md)) | [Changelog](CHANGELOG.md) | [Contributing](CONTRIBUTING.md) | [Security](SECURITY.md)
 
@@ -53,6 +53,7 @@
 ### 👥 Core Team
 
 - **Tinkle** - [@Web3Tinkle](https://x.com/Web3Tinkle)
+- **Official Twitter (Only)** - [@nofx_official](https://x.com/nofx_official)
 
 ### 💼 Seed Funding Round Open
 
@@ -243,7 +244,7 @@ NOFX is built with a modern, modular architecture:
 
 Before using this system, you need a Binance Futures account. **Use our referral link to save on trading fees:**
 
-**🎁 [Register Binance - Get Fee Discount](https://www.binance.com/join?ref=TINKLEVIP)**
+**🎁 [Register Binance - Get Fee Discount](https://www.binance.com/join?ref=NOFXENG)**
 
 ### Registration Steps:
 

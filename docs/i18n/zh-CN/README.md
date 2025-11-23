@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Backed by Amber.ac](https://img.shields.io/badge/Backed%20by-Amber.ac-orange.svg)](https://amber.ac)
 
-**语言 / Languages:** [English](../../../README.md) | [中文](../zh-CN/README.md) | [Українська](../uk/README.md) | [Русский](../ru/README.md) | [日本語](../ja/README.md)
+**语言 / Languages:** [English](../../../README.md) | [中文](../zh-CN/README.md) | [Українська](../uk/README.md) | [Русский](../ru/README.md) | [日本語](../ja/README.md) | [한국어](../ko/README.md)
 
 **📚 文档中心:** [文档首页](../../README.md) | [快速开始](../../getting-started/README.zh-CN.md) | [更新日志](../../../CHANGELOG.zh-CN.md) | [社区指南](../../community/README.md)
 
@@ -55,6 +55,7 @@
 ### 👥 核心团队
 
 - **Tinkle** - [@Web3Tinkle](https://x.com/Web3Tinkle)
+- **唯一官方推特** - [@nofx_official](https://x.com/nofx_official)
 
 ### 💼 种子轮融资进行中
 
@@ -245,7 +246,7 @@ NOFX 采用现代化的模块化架构：
 
 使用本系统前，您需要一个币安合约账户。**使用我们的推荐链接注册可享受手续费优惠：**
 
-**🎁 [注册币安 - 享手续费折扣](https://www.binance.com/join?ref=TINKLEVIP)**
+**🎁 [注册币安 - 享手续费折扣](https://www.binance.com/join?ref=NOFXCHI)**
 
 ### 注册步骤：
 

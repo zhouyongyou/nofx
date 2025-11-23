@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Backed by Amber.ac](https://img.shields.io/badge/Backed%20by-Amber.ac-orange.svg)](https://amber.ac)
 
-**言語:** [English](../../../README.md) | [中文](../zh-CN/README.md) | [Українська](../uk/README.md) | [Русский](../ru/README.md) | [日本語](README.md)
+**言語:** [English](../../../README.md) | [中文](../zh-CN/README.md) | [Українська](../uk/README.md) | [Русский](../ru/README.md) | [日本語](README.md) | [한국어](../ko/README.md)
 
 ---
 
@@ -53,6 +53,7 @@
 ### 👥 コアチーム
 
 - **Tinkle** - [@Web3Tinkle](https://x.com/Web3Tinkle)
+- **唯一公式推特** - [@nofx_official](https://x.com/nofx_official)
 
 ### 💼 シードラウンド募集中
 
@@ -270,7 +271,7 @@ nofx/
 
 このシステムを使用する前に、Binance先物アカウントが必要です。**紹介リンクを使用して取引手数料を節約しましょう：**
 
-**🎁 [Binance登録 - 手数料割引を取得](https://www.binance.com/join?ref=TINKLEVIP)**
+**🎁 [Binance登録 - 手数料割引を取得](https://www.binance.com/join?ref=NOFXJAPAN)**
 
 ### 登録手順：
 

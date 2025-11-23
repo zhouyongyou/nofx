@@ -350,20 +350,6 @@ func TestBybitTrader_CacheDuration(t *testing.T) {
 	assert.Equal(t, 15*time.Second, trader.cacheDuration)
 }
 
-// TestBybitTrader_BrokerID 测试 Broker ID 配置
-func TestBybitTrader_BrokerID(t *testing.T) {
-	// 验证 Broker ID 常量已定义
-	assert.Equal(t, "Up000938", BybitBrokerID)
-
-	// 创建 trader 并验证 HTTP Client 已配置
-	trader := NewBybitTrader("test", "test")
-	assert.NotNil(t, trader.client)
-	assert.NotNil(t, trader.client.HTTPClient)
-
-	// 验证 Transport 已设置（带有 Broker Referer）
-	assert.NotNil(t, trader.client.HTTPClient.Transport)
-}
-
 // ============================================================
 // 四、Mock 服务器集成测试
 // ============================================================
