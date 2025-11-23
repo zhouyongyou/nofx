@@ -95,6 +95,8 @@ type AutoTrader struct {
 	decisionLogger        logger.IDecisionLogger // 决策日志记录器
 	initialBalance        float64
 	dailyPnL              float64
+	dailyPnLBase          float64              // 日盈亏基准（当日开始时的净值）
+	needsDailyBaseline    bool                 // 是否需要重新设置日基准
 	customPrompt          string   // 自定义交易策略prompt
 	overrideBasePrompt    bool     // 是否覆盖基础prompt
 	systemPromptTemplate  string   // 系统提示词模板名称
@@ -255,6 +257,8 @@ func NewAutoTrader(config AutoTraderConfig, database interface{}, userID string)
 		defaultCoins:          config.DefaultCoins,
 		tradingCoins:          config.TradingCoins,
 		lastResetTime:         time.Now(),
+		dailyPnLBase:          config.InitialBalance,
+		needsDailyBaseline:    true,
 		startTime:             time.Now(),
 		callCount:             0,
 		isRunning:             false,
@@ -348,8 +352,10 @@ func (at *AutoTrader) runCycle() error {
 	// 2. 重置日盈亏（每天重置）
 	if time.Since(at.lastResetTime) > 24*time.Hour {
 		at.dailyPnL = 0
+		at.dailyPnLBase = 0
+		at.needsDailyBaseline = true
 		at.lastResetTime = time.Now()
-		log.Println("📅 日盈亏已重置")
+		log.Println("📅 日盈亏已重置，等待新的基准净值")
 	}
 
 	// 4. 收集交易上下文
@@ -360,6 +366,9 @@ func (at *AutoTrader) runCycle() error {
 		at.decisionLogger.LogDecision(record)
 		return fmt.Errorf("构建交易上下文失败: %w", err)
 	}
+
+	// 更新日盈亏指标（使用当前净值同步基准）
+	at.updatePnLMetrics(ctx.Account.TotalEquity)
 
 	// 保存账户状态快照
 	record.AccountState = logger.AccountSnapshot{
@@ -1756,4 +1765,17 @@ func (at *AutoTrader) ClearPeakPnLCache(symbol, side string) {
 
 	posKey := symbol + "_" + side
 	delete(at.peakPnLCache, posKey)
+}
+
+// updatePnLMetrics 更新日盈亏指标
+// 如果 dailyPnLBase 为 0 或需要重新设置基准，则使用当前净值作为基准
+func (at *AutoTrader) updatePnLMetrics(currentEquity float64) {
+	if at.dailyPnLBase == 0 || at.needsDailyBaseline {
+		at.dailyPnLBase = currentEquity
+		at.dailyPnL = 0
+		at.needsDailyBaseline = false
+		log.Printf("📊 日盈亏基准同步：%.2f USDT", currentEquity)
+	} else {
+		at.dailyPnL = currentEquity - at.dailyPnLBase
+	}
 }

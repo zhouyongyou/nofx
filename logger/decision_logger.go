@@ -14,6 +14,7 @@ import (
 type DecisionRecord struct {
 	Timestamp      time.Time          `json:"timestamp"`       // 决策时间
 	CycleNumber    int                `json:"cycle_number"`    // 周期编号
+	Exchange       string             `json:"exchange"`        // 交易所类型 (binance/hyperliquid/aster)
 	SystemPrompt   string             `json:"system_prompt"`   // 系统提示词（发送给AI的系统prompt）
 	InputPrompt    string             `json:"input_prompt"`    // 发送给AI的输入prompt
 	CoTTrace       string             `json:"cot_trace"`       // AI思维链（输出）
@@ -340,6 +341,28 @@ type SymbolPerformance struct {
 	AvgPnL        float64 `json:"avg_pn_l"`       // 平均盈亏
 }
 
+// getTakerFeeRate 获取交易所的Taker费率
+// 基于公开信息：
+// - Aster: Maker 0.010%, Taker 0.035%
+// - Hyperliquid: Maker 0.015%, Taker 0.045%
+// - Binance Futures: Maker 0.020%, Taker 0.050% (默认费率)
+// - Lighter: Maker 0.020%, Taker 0.050% (估计费率)
+func getTakerFeeRate(exchange string) float64 {
+	switch exchange {
+	case "aster":
+		return 0.00035 // 0.035%
+	case "hyperliquid":
+		return 0.00045 // 0.045%
+	case "binance":
+		return 0.0005 // 0.050%
+	case "lighter":
+		return 0.0005 // 0.050%
+	default:
+		// 对于未知交易所，使用保守估计（Binance费率）
+		return 0.0005
+	}
+}
+
 // AnalyzePerformance 分析最近N个周期的交易表现
 func (l *DecisionLogger) AnalyzePerformance(lookbackCycles int) (*PerformanceAnalysis, error) {
 	records, err := l.GetLatestRecords(lookbackCycles)
@@ -495,13 +518,19 @@ func (l *DecisionLogger) AnalyzePerformance(lookbackCycles int) (*PerformanceAna
 						actualQuantity = action.Quantity
 					}
 
-					// 计算本次平仓的盈亏（USDT）
+					// 计算本次平仓的盈亏（USDT）- 包含手续费
 					var pnl float64
 					if side == "long" {
 						pnl = actualQuantity * (action.Price - openPrice)
 					} else {
 						pnl = actualQuantity * (openPrice - action.Price)
 					}
+
+					// 🔧 BUG FIX: 只扣除平倉手續費，不重複扣除開倉手續費
+					// 開倉手續費已經在開倉時從帳戶餘額中扣除，不應在計算已實現盈虧時再次扣除
+					feeRate := getTakerFeeRate(record.Exchange)
+					closeFee := actualQuantity * action.Price * feeRate // 平仓手续费
+					pnl -= closeFee                                     // 从盈亏中扣除平仓手续费
 
 					// 🔧 BUG FIX：處理 partial_close 聚合邏輯
 					if action.Action == "partial_close" {
