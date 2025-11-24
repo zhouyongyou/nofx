@@ -43,6 +43,20 @@ func NewServer(traderManager *manager.TraderManager, database *config.Database, 
 
 	router := gin.Default()
 
+	// 反向代理支持：信任 X-Forwarded-For 和 X-Real-IP 头
+	// 当部署在 Nginx/Caddy/Traefik 等反向代理后面时启用
+	trustProxy := strings.EqualFold(os.Getenv("TRUST_PROXY"), "true")
+	if trustProxy {
+		// 设置信任的代理，获取真实客户端 IP
+		// 使用 gin 的 SetTrustedProxies 方法
+		router.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
+		log.Println("🔄 [Proxy] 已启用反向代理支持 (TRUST_PROXY=true)")
+		log.Println("    信任的代理网段: 127.0.0.1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16")
+	} else {
+		// 默认不信任任何代理
+		router.SetTrustedProxies(nil)
+	}
+
 	// 配置允许的 CORS 来源
 	allowedOrigins := []string{
 		"http://localhost:3000",
@@ -2430,11 +2444,16 @@ func (s *Server) handleLogout(c *gin.Context) {
 
 // handleRegister 处理用户注册请求
 func (s *Server) handleRegister(c *gin.Context) {
+	clientIP := c.ClientIP()
+	log.Printf("📝 [Register] 收到注册请求 (IP: %s, X-Forwarded-For: %s, X-Real-IP: %s)",
+		clientIP, c.GetHeader("X-Forwarded-For"), c.GetHeader("X-Real-IP"))
+
 	regEnabled := true
 	if regStr, err := s.database.GetSystemConfig("registration_enabled"); err == nil {
 		regEnabled = strings.ToLower(regStr) != "false"
 	}
 	if !regEnabled {
+		log.Printf("⚠️ [Register] 注册已关闭 (IP: %s)", clientIP)
 		c.JSON(http.StatusForbidden, gin.H{"error": "注册已关闭"})
 		return
 	}
@@ -2446,15 +2465,20 @@ func (s *Server) handleRegister(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("❌ [Register] 请求格式错误 (IP: %s): %v", clientIP, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("📧 [Register] 处理邮箱: %s (IP: %s)", req.Email, clientIP)
+
 	// 检查是否开启了内测模式
 	betaModeStr, _ := s.database.GetSystemConfig("beta_mode")
+	log.Printf("🔒 [Register] beta_mode=%s", betaModeStr)
 	if betaModeStr == "true" {
 		// 内测模式下必须提供有效的内测码
 		if req.BetaCode == "" {
+			log.Printf("⚠️ [Register] 内测模式但未提供内测码 (Email: %s)", req.Email)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "内测期间，注册需要提供内测码"})
 			return
 		}

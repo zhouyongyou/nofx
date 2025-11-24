@@ -24,6 +24,8 @@ services:
       - JWT_SECRET=${JWT_SECRET}  # JWT认证密钥
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}  # CORS白名单
       - ENABLE_CSRF=${ENABLE_CSRF}  # CSRF保护开关（默认关闭，生产环境建议启用）
+      - TRUST_PROXY=${TRUST_PROXY:-false}  # 反向代理支持（使用Nginx/Caddy时设为true）
+      - ENVIRONMENT=${ENVIRONMENT:-development}  # 环境模式（production启用严格安全策略）
     networks:
       - nofx-network
     healthcheck:

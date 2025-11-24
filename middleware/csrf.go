@@ -18,10 +18,12 @@ type CSRFConfig struct {
 	CookiePath     string        // Cookie 路径
 	CookieSecure   bool          // 是否仅 HTTPS
 	CookieSameSite http.SameSite // SameSite 属性
+	CookieDomain   string        // Cookie 域名（用于跨子域共享）
 	ExemptPaths    []string      // 豁免路径（不检查 CSRF）
 }
 
 // DefaultCSRFConfig 返回默认 CSRF 配置
+// 注意：此配置可通过环境变量进行调整
 func DefaultCSRFConfig() CSRFConfig {
 	return CSRFConfig{
 		TokenLength:    32,
@@ -29,7 +31,8 @@ func DefaultCSRFConfig() CSRFConfig {
 		HeaderName:     "X-CSRF-Token",
 		CookiePath:     "/",
 		CookieSecure:   false, // 开发环境设为 false，生产环境应为 true
-		CookieSameSite: http.SameSiteStrictMode,
+		CookieSameSite: http.SameSiteLaxMode, // 改为 Lax 以支持反向代理环境
+		CookieDomain:   "",                   // 空字符串表示当前域名
 		ExemptPaths: []string{
 			"/api/health",
 			"/api/supported-models",
