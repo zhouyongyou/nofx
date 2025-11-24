@@ -1529,7 +1529,37 @@ func (at *AutoTrader) executeUpdateStopLossWithRecord(decision *decision.Decisio
 		return fmt.Errorf("修改止损失败: %w", err)
 	}
 
+	// 更新内存中的止损价格
+	posKey := decision.Symbol + "_" + strings.ToLower(positionSide)
+	at.positionStopLoss[posKey] = decision.NewStopLoss
+
 	log.Printf("  ✓ 止损已调整: %.2f (当前价格: %.2f)", decision.NewStopLoss, marketData.CurrentPrice)
+
+	// ✅ 修复 Hyperliquid 止盈止损问题：
+	// Hyperliquid 无法区分止盈/止损单，CancelStopLossOrders 会取消所有挂单
+	// 因此需要在设置新止损后，重新恢复止盈单
+	if takeProfit, exists := at.positionTakeProfit[posKey]; exists && takeProfit > 0 {
+		// 验证止盈价格是否仍然有效
+		isValidTP := false
+		if positionSide == "LONG" && takeProfit > marketData.CurrentPrice {
+			isValidTP = true
+		} else if positionSide == "SHORT" && takeProfit < marketData.CurrentPrice {
+			isValidTP = true
+		}
+
+		if isValidTP {
+			log.Printf("  → 恢复止盈单: %.2f (Hyperliquid 兼容性修复)", takeProfit)
+			if err := at.trader.SetTakeProfit(decision.Symbol, positionSide, quantity, takeProfit); err != nil {
+				log.Printf("  ⚠️ 恢复止盈单失败: %v (止损已设置成功)", err)
+			} else {
+				log.Printf("  ✓ 止盈单已恢复: %.2f", takeProfit)
+			}
+		} else {
+			log.Printf("  ⚠️ 原止盈价 %.2f 已失效（%s仓位需%s当前价 %.2f），跳过恢复",
+				takeProfit, positionSide, map[string]string{"LONG": "高于", "SHORT": "低于"}[positionSide], marketData.CurrentPrice)
+		}
+	}
+
 	return nil
 }
 
@@ -1645,6 +1675,28 @@ func (at *AutoTrader) executeUpdateTakeProfitWithRecord(decision *decision.Decis
 	}
 
 	log.Printf("  ✓ 止盈已调整: %.2f (当前价格: %.2f)", decision.NewTakeProfit, marketData.CurrentPrice)
+
+	// ✅ 修复 Hyperliquid 止盈止损问题：
+	// Hyperliquid 无法区分止盈/止损单，CancelTakeProfitOrders 会取消所有挂单
+	// 因此需要在设置新止盈后，重新恢复止损单
+	posKey := decision.Symbol + "_" + positionSide
+	if stopLoss, exists := at.positionStopLoss[posKey]; exists && stopLoss > 0 {
+		// 验证止损价格仍然有效
+		isValidSL := false
+		if positionSide == "LONG" && stopLoss < marketData.CurrentPrice {
+			isValidSL = true
+		} else if positionSide == "SHORT" && stopLoss > marketData.CurrentPrice {
+			isValidSL = true
+		}
+
+		if isValidSL {
+			log.Printf("  → 恢复止损单: %.2f (Hyperliquid 兼容性修复)", stopLoss)
+			if err := at.trader.SetStopLoss(decision.Symbol, positionSide, quantity, stopLoss); err != nil {
+				log.Printf("  ⚠️ 恢复止损单失败: %v (止盈已设置成功)", err)
+			}
+		}
+	}
+
 	return nil
 }
 
