@@ -1160,29 +1160,31 @@ func (d *Database) migrateExchangesTableToAutoIncrement() error {
 
 // User 用户配置
 type User struct {
-	ID           string    `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"` // 不返回到前端
-	OTPSecret    string    `json:"-"` // 不返回到前端
-	OTPVerified  bool      `json:"otp_verified"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           string `json:"id"`
+	Email        string `json:"email"`
+	PasswordHash string `json:"-"` // 不返回到前端
+	OTPSecret    string `json:"-"` // 不返回到前端
+	OTPVerified  bool   `json:"otp_verified"`
+	// 使用 string 類型來避免 SQLite 時間解析問題
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // AIModelConfig AI模型配置
 type AIModelConfig struct {
-	ID              int       `json:"id"`       // 自增ID（主键）
-	ModelID         string    `json:"model_id"` // 模型类型ID（例如 "deepseek"）
-	UserID          string    `json:"user_id"`
-	DisplayName     string    `json:"display_name"` // 用户自定义显示名称
-	Name            string    `json:"name"`
-	Provider        string    `json:"provider"`
-	Enabled         bool      `json:"enabled"`
-	APIKey          string    `json:"apiKey"`
-	CustomAPIURL    string    `json:"customApiUrl"`
-	CustomModelName string    `json:"customModelName"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID              int    `json:"id"`       // 自增ID（主键）
+	ModelID         string `json:"model_id"` // 模型类型ID（例如 "deepseek"）
+	UserID          string `json:"user_id"`
+	DisplayName     string `json:"display_name"` // 用户自定义显示名称
+	Name            string `json:"name"`
+	Provider        string `json:"provider"`
+	Enabled         bool   `json:"enabled"`
+	APIKey          string `json:"apiKey"`
+	CustomAPIURL    string `json:"customApiUrl"`
+	CustomModelName string `json:"customModelName"`
+	// 使用 string 類型來避免 SQLite 時間解析問題
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // ExchangeConfig 交易所配置
@@ -1201,11 +1203,13 @@ type ExchangeConfig struct {
 	// Reference: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/nonces-and-api-wallets
 	HyperliquidWalletAddr string `json:"hyperliquidWalletAddr"` // Main Wallet Address (holds funds, never expose private key)
 	// Aster 特定字段
-	AsterUser       string    `json:"asterUser"`
-	AsterSigner     string    `json:"asterSigner"`
-	AsterPrivateKey string    `json:"asterPrivateKey"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	AsterUser       string `json:"asterUser"`
+	AsterSigner     string `json:"asterSigner"`
+	AsterPrivateKey string `json:"asterPrivateKey"`
+	// 使用 string 類型來避免 SQLite 時間解析問題
+	// SQLite 存儲時間為 TEXT，直接 Scan 到 time.Time 可能失敗
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // TraderRecord 交易员配置（数据库实体）
@@ -1230,21 +1234,23 @@ type TraderRecord struct {
 	TakerFeeRate         float64   `json:"taker_fee_rate"`         // Taker fee rate, default 0.0004
 	MakerFeeRate         float64   `json:"maker_fee_rate"`         // Maker fee rate, default 0.0002
 	OrderStrategy        string    `json:"order_strategy"`         // Order strategy: "market_only", "conservative_hybrid", "limit_only"
-	LimitPriceOffset     float64   `json:"limit_price_offset"`     // Limit order price offset percentage (e.g., -0.03 for -0.03%)
-	LimitTimeoutSeconds  int       `json:"limit_timeout_seconds"`  // Timeout in seconds before converting to market order (default: 60)
-	Timeframes           string    `json:"timeframes"`             // 时间线选择 (逗号分隔，例如: "1m,4h,1d")
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
+	LimitPriceOffset     float64 `json:"limit_price_offset"`     // Limit order price offset percentage (e.g., -0.03 for -0.03%)
+	LimitTimeoutSeconds  int     `json:"limit_timeout_seconds"`  // Timeout in seconds before converting to market order (default: 60)
+	Timeframes           string  `json:"timeframes"`             // 时间线选择 (逗号分隔，例如: "1m,4h,1d")
+	// 使用 string 類型來避免 SQLite 時間解析問題
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // UserSignalSource 用户信号源配置
 type UserSignalSource struct {
-	ID          int       `json:"id"`
-	UserID      string    `json:"user_id"`
-	CoinPoolURL string    `json:"coin_pool_url"`
-	OITopURL    string    `json:"oi_top_url"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          int    `json:"id"`
+	UserID      string `json:"user_id"`
+	CoinPoolURL string `json:"coin_pool_url"`
+	OITopURL    string `json:"oi_top_url"`
+	// 使用 string 類型來避免 SQLite 時間解析問題
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // GenerateOTPSecret 生成OTP密钥
