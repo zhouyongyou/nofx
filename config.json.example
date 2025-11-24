@@ -1,10 +1,14 @@
 {
+  "_comment": "NOFX Configuration File - Copy to config.json and customize",
+
   "beta_mode": false,
   "registration_enabled": true,
+
   "leverage": {
     "btc_eth_leverage": 5,
     "altcoin_leverage": 5
   },
+
   "use_default_coins": true,
   "default_coins": [
     "BTCUSDT",
@@ -16,12 +20,20 @@
     "ADAUSDT",
     "HYPEUSDT"
   ],
+
   "api_server_port": 8080,
   "max_daily_loss": 10.0,
   "max_drawdown": 20.0,
   "stop_trading_minutes": 60,
-  "jwt_secret": "Qk0kAa+d0iIEzXVHXbNbm+UaN3RNabmWtH8rDWZ5OPf+4GX8pBflAHodfpbipVMyrw1fsDanHsNBjhgbDeK9Jg==",
+
   "log": {
-    "level": "info"
+    "level": "info",
+    "_telegram_comment": "Optional: Enable Telegram notifications for errors",
+    "telegram": {
+      "enabled": false,
+      "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+      "chat_id": -1001234567890,
+      "min_level": "error"
+    }
   }
 }
