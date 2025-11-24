@@ -273,25 +273,33 @@ Docker automatically handles all dependencies (Go, Node.js, TA-Lib, SQLite) and 
 # 1. Copy environment variables template
 cp .env.example .env
 
-# 2. Generate security keys (Important for production!)
-# Generate JWT secret
-openssl rand -base64 64
+# 2. Generate security keys (REQUIRED!)
+# Option A: Use the setup script (Recommended)
+chmod +x scripts/setup-env.sh
+./scripts/setup-env.sh
 
-# Edit .env and set JWT_SECRET with the generated key
-nano .env  # Add: JWT_SECRET=your-generated-key
+# Option B: Generate manually
+# Generate DATA_ENCRYPTION_KEY (Required - protects your API keys in database)
+openssl rand -base64 32
+# Edit .env and set: DATA_ENCRYPTION_KEY=<your-generated-key>
+
+# Generate JWT_SECRET (Required for user authentication)
+openssl rand -base64 64
+# Edit .env and set: JWT_SECRET=<your-generated-key>
+
+nano .env  # Edit and paste your generated keys
 
 # 3. Copy configuration template
 cp config.json.example config.json
-
-# 4. Edit and fill in your API keys
-nano config.json  # or use any editor
 ```
 
 ⚠️ **Security Notes**:
-- **JWT_SECRET** is required for production environments
+- **DATA_ENCRYPTION_KEY** is **REQUIRED** - encrypts API keys stored in database
+- **JWT_SECRET** is required for user authentication
+- ❌ **Do NOT use the example key** `PLEASE_GENERATE_YOUR_OWN_KEY_HERE`
 - Set **ENVIRONMENT=production** in .env for production deployment
-- Configure **ALLOWED_ORIGINS** if deploying to a custom domain
-- Basic config.json is still needed for some settings, but ~~trader configurations~~ are now done through the web interface.
+- Set **TRUST_PROXY=true** if deploying behind Nginx/Caddy reverse proxy
+- Configure **CORS_ALLOWED_ORIGINS** if deploying to a custom domain
 
 #### Step 2: One-Click Start
 ```bash
