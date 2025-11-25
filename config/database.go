@@ -152,6 +152,8 @@ func (d *Database) createTables() error {
 			lighter_wallet_addr TEXT DEFAULT '',
 			lighter_private_key TEXT DEFAULT '',
 			lighter_api_key_private_key TEXT DEFAULT '',
+			-- OKX 特定字段
+			okx_passphrase TEXT DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -362,6 +364,7 @@ func (d *Database) createTables() error {
 		`ALTER TABLE exchanges ADD COLUMN lighter_wallet_addr TEXT DEFAULT ''`,
 		`ALTER TABLE exchanges ADD COLUMN lighter_private_key TEXT DEFAULT ''`,
 		`ALTER TABLE exchanges ADD COLUMN lighter_api_key_private_key TEXT DEFAULT ''`,
+		`ALTER TABLE exchanges ADD COLUMN okx_passphrase TEXT DEFAULT ''`,
 		`ALTER TABLE traders ADD COLUMN custom_prompt TEXT DEFAULT ''`,
 		`ALTER TABLE traders ADD COLUMN override_base_prompt BOOLEAN DEFAULT 0`,
 		`ALTER TABLE traders ADD COLUMN is_cross_margin BOOLEAN DEFAULT 1`,             // 默认为全仓模式
@@ -489,6 +492,7 @@ func (d *Database) initDefaultData() error {
 	}{
 		{"binance", "Binance Futures", "binance"},
 		{"bybit", "Bybit Futures", "bybit"},
+		{"okx", "OKX Futures", "okx"},
 		{"hyperliquid", "Hyperliquid", "hyperliquid"},
 		{"aster", "Aster DEX", "aster"},
 		{"lighter", "LIGHTER DEX", "lighter"},
@@ -748,8 +752,10 @@ type ExchangeConfig struct {
 	LighterWalletAddr       string `json:"lighterWalletAddr"`       // Ethereum 钱包地址 (L1)
 	LighterPrivateKey       string `json:"lighterPrivateKey"`       // L1私钥（用于识别账户）
 	LighterAPIKeyPrivateKey string `json:"lighterAPIKeyPrivateKey"` // API Key私钥（40字节，用于签名交易）
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	// OKX 特定字段
+	OKXPassphrase string `json:"okxPassphrase"` // OKX API Passphrase
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // TraderRecord 交易员配置（数据库实体）
