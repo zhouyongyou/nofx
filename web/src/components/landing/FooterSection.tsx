@@ -186,7 +186,6 @@ export default function FooterSection({ language }: FooterSectionProps) {
                   className="flex items-center justify-center gap-1.5 mb-1"
                   style={{ color: 'var(--text-tertiary)' }}
                 >
-                  <span style={{ color: '#F0B90B' }}>⚠️</span>
                   <span style={{ fontWeight: '500' }}>
                     {language === 'zh'
                       ? '實驗性社區版本（非官方）'

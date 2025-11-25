@@ -4,6 +4,12 @@ import { execSync } from 'child_process'
 
 // Get current git branch name at build time
 function getGitBranch(): string {
+  // 優先使用環境變數（Docker 構建時使用）
+  if (process.env.VITE_GIT_BRANCH) {
+    return process.env.VITE_GIT_BRANCH
+  }
+
+  // 本地開發時從 git 讀取
   try {
     return execSync('git rev-parse --abbrev-ref HEAD').toString().trim()
   } catch {
