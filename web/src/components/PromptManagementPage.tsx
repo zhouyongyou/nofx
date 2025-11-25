@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { httpClient } from '../lib/httpClient'
+import { useLanguage } from '../contexts/LanguageContext'
+import { t } from '../i18n/translations'
 
 interface PromptTemplate {
   name: string
@@ -10,6 +12,7 @@ interface PromptTemplate {
 }
 
 export default function PromptManagementPage() {
+  const { language } = useLanguage()
   const [templates, setTemplates] = useState<PromptTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] =
     useState<PromptTemplate | null>(null)
@@ -27,7 +30,7 @@ export default function PromptManagementPage() {
       if (response.success && response.data) {
         setTemplates(response.data.templates || [])
       } else {
-        toast.error(response.message || '加载模板失败')
+        toast.error(response.message || t('promptsLoadFailed', language))
       }
     } catch (error) {
       console.error('加载模板失败:', error)
@@ -51,7 +54,7 @@ export default function PromptManagementPage() {
       if (response.success && response.data) {
         setEditContent(response.data.content || '')
       } else {
-        toast.error(response.message || '获取模板内容失败')
+        toast.error(response.message || t('promptsGetFailed', language))
         setEditContent('')
       }
     } catch (error) {
@@ -71,10 +74,10 @@ export default function PromptManagementPage() {
       )
 
       if (response.success) {
-        toast.success('保存成功')
+        toast.success(t('promptsSaveSuccess', language))
         loadTemplates()
       } else {
-        toast.error(response.message || '保存失败')
+        toast.error(response.message || t('promptsSaveFailed', language))
       }
     } catch (error) {
       console.error('保存失败:', error)
@@ -84,7 +87,7 @@ export default function PromptManagementPage() {
   // 创建新模板
   const handleCreate = async () => {
     if (!newTemplateName.trim()) {
-      toast.error('请输入模板名称')
+      toast.error(t('promptsEnterName', language))
       return
     }
 
@@ -98,12 +101,12 @@ export default function PromptManagementPage() {
       )
 
       if (response.success) {
-        toast.success('创建成功')
+        toast.success(t('promptsCreateSuccess', language))
         setIsCreateModalOpen(false)
         setNewTemplateName('')
         loadTemplates()
       } else {
-        toast.error(response.message || '创建失败')
+        toast.error(response.message || t('promptsCreateFailed', language))
       }
     } catch (error) {
       console.error('创建失败:', error)
@@ -120,13 +123,13 @@ export default function PromptManagementPage() {
       )
 
       if (response.success) {
-        toast.success('删除成功')
+        toast.success(t('promptsDeleteSuccess', language))
         setIsDeleteModalOpen(false)
         setSelectedTemplate(null)
         setEditContent('')
         loadTemplates()
       } else {
-        toast.error(response.message || '删除失败')
+        toast.error(response.message || t('promptsDeleteFailed', language))
       }
     } catch (error) {
       console.error('删除失败:', error)
@@ -140,9 +143,9 @@ export default function PromptManagementPage() {
     >
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-4 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">提示词管理</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">{t('promptsManagement', language)}</h1>
         <p className="text-sm sm:text-base text-gray-400">
-          管理您的 AI 交易策略提示词模板
+          {t('promptsManagementDesc', language)}
         </p>
       </div>
 
@@ -153,7 +156,7 @@ export default function PromptManagementPage() {
           className="px-4 py-2 rounded font-semibold transition-all hover:scale-105 text-sm sm:text-base"
           style={{ background: '#F0B90B', color: '#000' }}
         >
-          + 新建模板
+          {t('promptsCreateBtn', language)}
         </button>
         <button
           onClick={loadTemplates}
@@ -164,7 +167,7 @@ export default function PromptManagementPage() {
             border: '1px solid #F0B90B',
           }}
         >
-          🔄 刷新
+          {t('promptsRefreshBtn', language)}
         </button>
       </div>
 
@@ -173,7 +176,7 @@ export default function PromptManagementPage() {
         {/* Template List (Left Sidebar) */}
         <div className="lg:col-span-3 bg-[#1E2329] border border-[#2B3139] rounded-lg p-3 sm:p-4">
           <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">
-            📁 模板列表 ({templates.length})
+            {t('promptsTemplateList', language)} ({templates.length})
           </h2>
           <div className="space-y-2 max-h-[200px] lg:max-h-none overflow-y-auto lg:overflow-visible">
             {templates.map((template) => (
@@ -193,7 +196,7 @@ export default function PromptManagementPage() {
                 }}
               >
                 {template.name === 'default' && '⭐ '}
-                {template.display_name?.zh || template.name}
+                {template.display_name?.[language] || template.name}
               </button>
             ))}
           </div>
@@ -206,7 +209,7 @@ export default function PromptManagementPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
                 <h2 className="text-lg sm:text-xl font-bold truncate">
                   📝{' '}
-                  {selectedTemplate.display_name?.zh || selectedTemplate.name}
+                  {selectedTemplate.display_name?.[language] || selectedTemplate.name}
                 </h2>
                 <div className="flex gap-2 sm:gap-3 flex-shrink-0">
                   <button
@@ -214,7 +217,7 @@ export default function PromptManagementPage() {
                     className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded font-semibold transition-all hover:scale-105 text-sm sm:text-base"
                     style={{ background: '#0ECB81', color: '#FFF' }}
                   >
-                    💾 保存
+                    {t('promptsSaveBtn', language)}
                   </button>
                   {selectedTemplate.name !== 'default' && (
                     <button
@@ -226,15 +229,15 @@ export default function PromptManagementPage() {
                         border: '1px solid #F6465D',
                       }}
                     >
-                      🗑️ 删除
+                      {t('promptsDeleteBtn', language)}
                     </button>
                   )}
                 </div>
               </div>
 
-              {selectedTemplate.description?.zh && (
+              {selectedTemplate.description?.[language] && (
                 <p className="text-xs sm:text-sm text-gray-400 mb-4">
-                  {selectedTemplate.description.zh}
+                  {selectedTemplate.description[language]}
                 </p>
               )}
 
@@ -251,13 +254,13 @@ export default function PromptManagementPage() {
               />
 
               <div className="mt-2 flex justify-between text-xs text-gray-500">
-                <span>字符数: {editContent?.length || 0}</span>
-                <span>行数: {editContent?.split('\n').length || 0}</span>
+                <span>{t('promptsCharCount', language).replace('{count}', String(editContent?.length || 0))}</span>
+                <span>{t('promptsLineCount', language).replace('{count}', String(editContent?.split('\n').length || 0))}</span>
               </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-[300px] sm:h-[500px] text-gray-500">
-              <p className="text-base sm:text-lg">请从上方选择一个模板</p>
+              <p className="text-base sm:text-lg">{t('promptsSelectPrompt', language)}</p>
             </div>
           )}
         </div>
@@ -267,12 +270,12 @@ export default function PromptManagementPage() {
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-[#1E2329] border border-[#2B3139] rounded-lg p-4 sm:p-6 w-full max-w-md">
-            <h2 className="text-lg sm:text-xl font-bold mb-4">新建模板</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4">{t('promptsNewTemplate', language)}</h2>
             <input
               type="text"
               value={newTemplateName}
               onChange={(e) => setNewTemplateName(e.target.value)}
-              placeholder="输入模板名称（英文）"
+              placeholder={t('promptsEnterName', language)}
               className="w-full px-3 py-2 rounded mb-4 text-sm sm:text-base"
               style={{
                 background: '#0B0E11',
@@ -289,14 +292,14 @@ export default function PromptManagementPage() {
                   color: '#EAECEF',
                 }}
               >
-                取消
+                {t('promptsCancelBtn', language)}
               </button>
               <button
                 onClick={handleCreate}
                 className="px-4 py-2 rounded font-semibold text-sm sm:text-base order-1 sm:order-2"
                 style={{ background: '#F0B90B', color: '#000' }}
               >
-                创建
+                {t('promptsCreateBtn2', language)}
               </button>
             </div>
           </div>
@@ -307,9 +310,9 @@ export default function PromptManagementPage() {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-[#1E2329] border border-[#2B3139] rounded-lg p-4 sm:p-6 w-full max-w-md">
-            <h2 className="text-lg sm:text-xl font-bold mb-4">确认删除</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4">{t('promptsConfirmDelete', language)}</h2>
             <p className="mb-4 text-sm sm:text-base text-gray-400">
-              确定要删除模板「{selectedTemplate?.name}」吗？此操作无法撤销。
+              {t('promptsConfirmDeleteMsg', language).replace('{name}', selectedTemplate?.name || '')}
             </p>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
               <button
@@ -320,14 +323,14 @@ export default function PromptManagementPage() {
                   color: '#EAECEF',
                 }}
               >
-                取消
+                {t('promptsCancelBtn', language)}
               </button>
               <button
                 onClick={handleDelete}
                 className="px-4 py-2 rounded font-semibold text-sm sm:text-base order-1 sm:order-2"
                 style={{ background: '#F6465D', color: '#FFF' }}
               >
-                删除
+                {t('promptsDeleteBtn', language)}
               </button>
             </div>
           </div>
