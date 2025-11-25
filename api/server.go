@@ -124,6 +124,12 @@ func (s *Server) setupRoutes() {
 			// 服务器IP查询（需要认证，用于白名单配置）
 			protected.GET("/server-ip", s.handleGetServerIP)
 
+			// 提示词模板管理（需要认证）
+			protected.POST("/prompt-templates", s.handleCreatePromptTemplate)
+			protected.PUT("/prompt-templates/:name", s.handleUpdatePromptTemplate)
+			protected.DELETE("/prompt-templates/:name", s.handleDeletePromptTemplate)
+			protected.POST("/prompt-templates/reload", s.handleReloadPromptTemplates)
+
 			// AI交易员管理
 			protected.GET("/my-traders", s.handleTraderList)
 			protected.GET("/traders/:id/config", s.handleGetTraderConfig)
@@ -2100,6 +2106,108 @@ func (s *Server) handleGetPromptTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"name":    template.Name,
 		"content": template.Content,
+	})
+}
+
+// handleCreatePromptTemplate 创建新的提示词模板
+func (s *Server) handleCreatePromptTemplate(c *gin.Context) {
+	var req struct {
+		Name    string `json:"name" binding:"required"`
+		Content string `json:"content" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		return
+	}
+
+	// 检查模板是否已存在
+	if decision.TemplateExists(req.Name) {
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("模板已存在: %s", req.Name)})
+		return
+	}
+
+	// 保存模板
+	if err := decision.SavePromptTemplate(req.Name, req.Content); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("创建模板失败: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "模板创建成功",
+		"name":    req.Name,
+	})
+}
+
+// handleUpdatePromptTemplate 更新提示词模板
+func (s *Server) handleUpdatePromptTemplate(c *gin.Context) {
+	templateName := c.Param("name")
+
+	var req struct {
+		Content string `json:"content" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		return
+	}
+
+	// 检查模板是否存在
+	if !decision.TemplateExists(templateName) {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("模板不存在: %s", templateName)})
+		return
+	}
+
+	// 更新模板
+	if err := decision.SavePromptTemplate(templateName, req.Content); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("更新模板失败: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "模板更新成功",
+		"name":    templateName,
+	})
+}
+
+// handleDeletePromptTemplate 删除提示词模板
+func (s *Server) handleDeletePromptTemplate(c *gin.Context) {
+	templateName := c.Param("name")
+
+	// 删除模板
+	if err := decision.DeletePromptTemplate(templateName); err != nil {
+		if strings.Contains(err.Error(), "不能删除系统模板") {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		} else if strings.Contains(err.Error(), "模板不存在") {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("删除模板失败: %v", err)})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "模板删除成功",
+	})
+}
+
+// handleReloadPromptTemplates 重新加载所有提示词模板
+func (s *Server) handleReloadPromptTemplates(c *gin.Context) {
+	if err := decision.ReloadPromptTemplates(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("重新加载失败: %v", err),
+		})
+		return
+	}
+
+	templates := decision.GetAllPromptTemplates()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "重新加载成功",
+		"count":   len(templates),
 	})
 }
 
