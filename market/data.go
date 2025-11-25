@@ -25,9 +25,16 @@ var (
 )
 
 // Get 获取指定代币的市场数据
-func Get(symbol string) (*Data, error) {
+func Get(symbol string, timeframes []string) (*Data, error) {
 	var klines3m, klines4h []Kline
 	var err error
+
+	// 设置默认时间线（如果未指定）
+	if len(timeframes) == 0 {
+		timeframes = []string{"3m", "4h"}
+		log.Printf("⚠️  %s 未指定时间线，使用默认值: 3m, 4h", symbol)
+	}
+
 	// 标准化symbol
 	symbol = Normalize(symbol)
 	// 获取3分钟K线数据 (最近10个)

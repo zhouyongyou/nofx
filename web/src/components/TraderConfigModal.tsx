@@ -26,8 +26,10 @@ interface TraderConfigData {
   is_cross_margin: boolean
   use_coin_pool: boolean
   use_oi_top: boolean
+  timeframes?: string // K线时间线选择 (逗号分隔，例如: "3m,4h")
   initial_balance?: number // 可选：创建时不需要，编辑时使用
   scan_interval_minutes: number
+  is_running?: boolean
 }
 
 interface TraderConfigModalProps {
@@ -63,7 +65,10 @@ export function TraderConfigModal({
     is_cross_margin: true,
     use_coin_pool: false,
     use_oi_top: false,
+    timeframes: '3m,4h', // 默认时间线
+    initial_balance: 100,
     scan_interval_minutes: 3,
+    is_running: false,
   })
   const [isSaving, setIsSaving] = useState(false)
   const [availableCoins, setAvailableCoins] = useState<string[]>([])
@@ -98,8 +103,10 @@ export function TraderConfigModal({
         is_cross_margin: true,
         use_coin_pool: false,
         use_oi_top: false,
+        timeframes: '3m,4h', // 默认时间线
         initial_balance: 1000,
         scan_interval_minutes: 3,
+        is_running: false,
       })
     }
     // 确保旧数据也有默认的 system_prompt_template
@@ -107,6 +114,13 @@ export function TraderConfigModal({
       setFormData((prev) => ({
         ...prev,
         system_prompt_template: 'default',
+      }))
+    }
+    // 确保旧数据也有默认的 timeframes
+    if (traderData && traderData.timeframes === undefined) {
+      setFormData((prev) => ({
+        ...prev,
+        timeframes: '3m,4h',
       }))
     }
   }, [traderData, isEditMode, availableModels, availableExchanges])
@@ -253,6 +267,7 @@ export function TraderConfigModal({
         is_cross_margin: formData.is_cross_margin,
         use_coin_pool: formData.use_coin_pool,
         use_oi_top: formData.use_oi_top,
+        timeframes: formData.timeframes, // K线时间线配置
         scan_interval_minutes: formData.scan_interval_minutes,
       }
 

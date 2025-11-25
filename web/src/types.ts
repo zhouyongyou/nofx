@@ -141,6 +141,7 @@ export interface CreateTraderRequest {
   is_cross_margin?: boolean
   use_coin_pool?: boolean
   use_oi_top?: boolean
+  timeframes?: string // K线时间线选择 (逗号分隔，例如: "3m,4h")
 }
 
 export interface UpdateModelConfigRequest {
@@ -209,6 +210,7 @@ export interface TraderConfigData {
   is_cross_margin: boolean
   use_coin_pool: boolean
   use_oi_top: boolean
+  timeframes: string // K线时间线选择 (逗号分隔，例如: "3m,4h")
   initial_balance: number
   scan_interval_minutes: number
   is_running: boolean
