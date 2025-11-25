@@ -243,6 +243,47 @@ export function AITradersPage({ onTraderSelect }: AITradersPageProps) {
           language={language}
         />
       )}
+
+      {/* Fork attribution - Experimental version warning */}
+      {typeof __GIT_BRANCH__ !== 'undefined' &&
+        __GIT_BRANCH__ !== 'unknown' &&
+        __GIT_BRANCH__ !== 'main' &&
+        __GIT_BRANCH__ !== 'master' && (
+          <div className="mt-8 pt-6" style={{ borderTop: '1px solid var(--panel-border)' }}>
+            <div className="text-center text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              <p className="mb-1" style={{ fontWeight: '500' }}>
+                {language === 'zh'
+                  ? '實驗性社區版本（非官方）'
+                  : 'Experimental Community Fork (Unofficial)'}
+              </p>
+              <p style={{ fontSize: '0.7rem' }}>
+                {language === 'zh' ? '維護者：' : 'Maintainer: '}
+                <a
+                  href="https://github.com/the-dev-z/nofx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#F0B90B] transition-colors"
+                  style={{ color: 'var(--brand-yellow)' }}
+                >
+                  the-dev-z/nofx
+                </a>
+                {' ('}
+                <span style={{ color: '#848E9C' }}>{__GIT_BRANCH__}</span>
+                {') | '}
+                {language === 'zh' ? '上游：' : 'Upstream: '}
+                <a
+                  href="https://github.com/tinkle-community/nofx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#F0B90B] transition-colors"
+                  style={{ color: '#848E9C' }}
+                >
+                  tinkle-community/nofx
+                </a>
+              </p>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
