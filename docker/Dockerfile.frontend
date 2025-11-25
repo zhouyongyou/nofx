@@ -7,18 +7,20 @@
 
 ARG NODE_VERSION=20-alpine
 ARG NGINX_VERSION=alpine
+ARG GIT_BRANCH=unknown
 
 # ──────────────────────────────────────────────────────────────
 # Build Stage (Node)
 # ──────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS builder
+ARG GIT_BRANCH
 WORKDIR /build
 
 COPY web/package*.json ./
 RUN npm ci
 
 COPY web/ ./
-RUN npm run build
+RUN VITE_GIT_BRANCH=${GIT_BRANCH} npm run build
 
 # ──────────────────────────────────────────────────────────────
 # Runtime Stage (Nginx)

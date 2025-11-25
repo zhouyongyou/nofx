@@ -538,7 +538,6 @@ export default function HeaderBar({
                   }}
                   title={`Fork maintained by the-dev-z • Branch: ${__GIT_BRANCH__}`}
                 >
-                  <span className="text-sm">🔱</span>
                   <span className="text-xs font-medium">{__GIT_BRANCH__}</span>
                 </a>
               )}

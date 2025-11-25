@@ -45,6 +45,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/Dockerfile.frontend
+      args:
+        GIT_BRANCH: ${GIT_BRANCH:-unknown}
     container_name: nofx-frontend
     restart: unless-stopped
     ports:
