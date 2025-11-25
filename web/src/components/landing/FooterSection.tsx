@@ -176,39 +176,49 @@ export default function FooterSection({ language }: FooterSectionProps) {
           <p>{t('footerTitle', language)}</p>
           <p className="mt-1">{t('footerWarning', language)}</p>
 
-          {/* Fork attribution */}
+          {/* Fork attribution - Experimental version warning */}
           {typeof __GIT_BRANCH__ !== 'undefined' &&
             __GIT_BRANCH__ !== 'unknown' &&
             __GIT_BRANCH__ !== 'main' &&
             __GIT_BRANCH__ !== 'master' && (
-              <p className="mt-3" style={{ color: 'var(--text-tertiary)' }}>
-                {language === 'zh'
-                  ? '此版本為 '
-                  : 'This is a fork maintained by '}
-                <a
-                  href="https://github.com/the-dev-z/nofx"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-[#F0B90B] transition-colors"
-                  style={{ color: 'var(--brand-yellow)' }}
+              <div className="mt-3">
+                <p
+                  className="flex items-center justify-center gap-1.5 mb-1"
+                  style={{ color: 'var(--text-tertiary)' }}
                 >
-                  the-dev-z/nofx
-                </a>
-                {language === 'zh' ? ' 的社區維護分支' : ' community fork'}
-                {' ('}
-                <span style={{ color: '#848E9C' }}>{__GIT_BRANCH__}</span>
-                {')'}
-                {language === 'zh' ? '，基於 ' : ' based on '}
-                <a
-                  href="https://github.com/tinkle-community/nofx"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-[#F0B90B] transition-colors"
-                  style={{ color: '#848E9C' }}
-                >
-                  tinkle-community/nofx
-                </a>
-              </p>
+                  <span style={{ color: '#F0B90B' }}>⚠️</span>
+                  <span style={{ fontWeight: '500' }}>
+                    {language === 'zh'
+                      ? '實驗性社區版本（非官方）'
+                      : 'Experimental Community Fork (Unofficial)'}
+                  </span>
+                </p>
+                <p style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem' }}>
+                  {language === 'zh' ? '維護者：' : 'Maintainer: '}
+                  <a
+                    href="https://github.com/the-dev-z/nofx"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#F0B90B] transition-colors"
+                    style={{ color: 'var(--brand-yellow)' }}
+                  >
+                    the-dev-z/nofx
+                  </a>
+                  {' ('}
+                  <span style={{ color: '#848E9C' }}>{__GIT_BRANCH__}</span>
+                  {') | '}
+                  {language === 'zh' ? '上游：' : 'Upstream: '}
+                  <a
+                    href="https://github.com/tinkle-community/nofx"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#F0B90B] transition-colors"
+                    style={{ color: '#848E9C' }}
+                  >
+                    tinkle-community/nofx
+                  </a>
+                </p>
+              </div>
             )}
         </div>
       </div>
