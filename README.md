@@ -12,6 +12,19 @@
 
 ---
 
+> ## ⚠️ Experimental Community Fork (Unofficial)
+>
+> **🔬 This is an experimental, independently maintained fork by individual developers.**
+>
+> - 🚨 **Not Official**: This is NOT the official NOFX version
+> - 🧪 **Experimental Features**: Contains experimental fixes and features under testing
+> - 👤 **Independent Maintenance**: Maintained by [the-dev-z](https://github.com/the-dev-z)
+> - 🔗 **Upstream**: Based on [tinkle-community/nofx](https://github.com/tinkle-community/nofx)
+> - 💬 **Feedback**: Report issues at [Issues](https://github.com/the-dev-z/nofx/issues)
+>
+> **Use at your own risk. For production use, consider the official upstream version.**
+
+---
 ## 📑 Table of Contents
 
 - [🚀 Universal AI Trading Operating System](#-universal-ai-trading-operating-system)
