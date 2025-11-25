@@ -1,5 +1,15 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { execSync } from 'child_process'
+
+// Get current git branch name at build time
+function getGitBranch(): string {
+  try {
+    return execSync('git rev-parse --abbrev-ref HEAD').toString().trim()
+  } catch {
+    return 'unknown'
+  }
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -12,5 +22,9 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  define: {
+    // Inject git branch name as global constant
+    __GIT_BRANCH__: JSON.stringify(getGitBranch()),
   },
 })

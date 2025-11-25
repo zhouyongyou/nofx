@@ -81,6 +81,26 @@ export default function HeaderBar({
           >
             Agentic Trading OS
           </span>
+          {/* Git Branch Badge */}
+          {typeof __GIT_BRANCH__ !== 'undefined' &&
+            __GIT_BRANCH__ !== 'unknown' &&
+            __GIT_BRANCH__ !== 'main' &&
+            __GIT_BRANCH__ !== 'master' && (
+              <a
+                href="https://github.com/the-dev-z/nofx"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-2 py-0.5 rounded hidden sm:inline-block hover:opacity-80 transition-opacity"
+                style={{
+                  background: 'rgba(240, 185, 11, 0.15)',
+                  color: 'var(--brand-yellow)',
+                  border: '1px solid rgba(240, 185, 11, 0.3)',
+                }}
+                title={`Fork maintained by the-dev-z • Branch: ${__GIT_BRANCH__}`}
+              >
+                🔱 {__GIT_BRANCH__}
+              </a>
+            )}
         </Link>
 
         {/* Desktop Menu */}
