@@ -21,6 +21,7 @@ export const translations = {
     configNav: 'Config',
     dashboardNav: 'Dashboard',
     faqNav: 'FAQ',
+    promptsNav: 'Prompts',
 
     // Footer
     footerTitle: 'NOFX - AI Trading System',
@@ -884,6 +885,7 @@ export const translations = {
     configNav: '配置',
     dashboardNav: '看板',
     faqNav: '常见问题',
+    promptsNav: '提示词',
 
     // Footer
     footerTitle: 'NOFX - AI交易系统',

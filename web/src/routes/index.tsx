@@ -9,6 +9,7 @@ import { ResetPasswordPage } from '../components/ResetPasswordPage'
 import { CompetitionPage } from '../components/CompetitionPage'
 import { AITradersPage } from '../pages/AITradersPage'
 import TraderDashboard from '../pages/TraderDashboard'
+import PromptManagementPage from '../components/PromptManagementPage'
 
 export const router = createBrowserRouter([
   {
@@ -52,6 +53,10 @@ export const router = createBrowserRouter([
       {
         path: '/dashboard',
         element: <TraderDashboard />,
+      },
+      {
+        path: '/prompts',
+        element: <PromptManagementPage />,
       },
     ],
   },
