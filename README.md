@@ -24,6 +24,49 @@
 > **Use at your own risk. For production use, consider the official upstream version.**
 
 ---
+
+## 🌿 Branch Strategy
+
+This fork maintains multiple branches for different use cases:
+
+| Branch | Status | Purpose | Recommended For |
+|--------|--------|---------|-----------------|
+| **z-dev-v2** | 🟢 Stable | Production-ready with critical fixes | Production environments |
+| **z-dev-v3** | 🟡 Experimental | Latest features (Bybit, LIGHTER DEX, Prompts Management UI) | Testing & Development |
+| **z-dev** | 🔒 Protected | Reserved for major releases | Pull Requests only |
+
+### 🎯 Unique Features in This Fork
+
+**Compared to upstream, this fork adds:**
+
+#### ✅ Already Implemented
+- **🔐 Security Enhancements**
+  - Removed hardcoded JWT secrets from config examples
+  - Improved encryption error handling
+  - Better API key validation
+
+- **🎨 UI/UX Improvements**
+  - Auto-detect Git branch and display fork attribution
+  - Prompts Management UI (CRUD operations for AI templates)
+  - Optimized Header layout
+
+- **📊 V3 Exclusive Features** (z-dev-v3 branch)
+  - Bybit Futures support with broker commission tracking
+  - LIGHTER DEX integration (SDK + frontend UI)
+  - Axios-based httpClient with unified error handling
+  - Korean language support
+
+#### 🚧 In Progress
+- Prompts Management i18n (multi-language support)
+- More comprehensive testing coverage
+
+### 📌 Choosing Your Branch
+
+- **For Production**: Use `z-dev-v2` - stable and battle-tested
+- **For Latest Features**: Use `z-dev-v3` - includes Bybit, LIGHTER DEX, more exchanges
+- **For Contributing**: Submit PRs to `z-dev` branch
+
+---
 ## 📑 Table of Contents
 
 - [🚀 Universal AI Trading Operating System](#-universal-ai-trading-operating-system)
