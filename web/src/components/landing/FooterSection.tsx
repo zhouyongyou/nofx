@@ -175,45 +175,36 @@ export default function FooterSection({ language }: FooterSectionProps) {
         >
           <p>{t('footerTitle', language)}</p>
           <p className="mt-1">{t('footerWarning', language)}</p>
-
-          {/* Fork attribution - Experimental version warning */}
-          <div className="mt-3">
-            <p
-              className="flex items-center justify-center gap-1.5 mb-1"
-              style={{ color: 'var(--text-tertiary)' }}
+          <p className="mt-2" style={{ fontWeight: '500' }}>
+            {language === 'zh'
+              ? '實驗性社區版本（非官方）'
+              : 'Experimental Community Fork (Unofficial)'}
+          </p>
+          <p className="mt-1" style={{ fontSize: '0.7rem' }}>
+            {language === 'zh' ? '維護者：' : 'Maintainer: '}
+            <a
+              href="https://github.com/the-dev-z/nofx/tree/z-dev-v2"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#F0B90B] transition-colors"
+              style={{ color: 'var(--brand-yellow)' }}
             >
-              <span style={{ fontWeight: '500' }}>
-                {language === 'zh'
-                  ? '實驗性社區版本（非官方）'
-                  : 'Experimental Community Fork (Unofficial)'}
-              </span>
-            </p>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem' }}>
-              {language === 'zh' ? '維護者：' : 'Maintainer: '}
-              <a
-                href="https://github.com/the-dev-z/nofx/tree/z-dev-v2"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-[#F0B90B] transition-colors"
-                style={{ color: 'var(--brand-yellow)' }}
-              >
-                the-dev-z/nofx
-              </a>
-              {' ('}
-              <span style={{ color: '#848E9C' }}>z-dev-v2</span>
-              {') | '}
-              {language === 'zh' ? '上游：' : 'Upstream: '}
-              <a
-                href="https://github.com/tinkle-community/nofx"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-[#F0B90B] transition-colors"
-                style={{ color: '#848E9C' }}
-              >
-                tinkle-community/nofx
-              </a>
-            </p>
-          </div>
+              the-dev-z/nofx
+            </a>
+            {' ('}
+            <span style={{ color: '#848E9C' }}>z-dev-v2</span>
+            {') | '}
+            {language === 'zh' ? '上游：' : 'Upstream: '}
+            <a
+              href="https://github.com/tinkle-community/nofx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[#F0B90B] transition-colors"
+              style={{ color: '#848E9C' }}
+            >
+              tinkle-community/nofx
+            </a>
+          </p>
         </div>
       </div>
     </footer>
