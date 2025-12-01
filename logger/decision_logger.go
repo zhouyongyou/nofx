@@ -355,6 +355,8 @@ func getTakerFeeRate(exchange string) float64 {
 		return 0.00045 // 0.045%
 	case "binance":
 		return 0.0005 // 0.050%
+	case "bybit":
+		return 0.00055 // 0.055% (Bybit taker fee)
 	case "lighter":
 		return 0.0005 // 0.050%
 	default:
