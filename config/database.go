@@ -875,6 +875,7 @@ func (d *Database) GetExchanges(userID string) ([]*ExchangeConfig, error) {
 		       COALESCE(aster_private_key, '') as aster_private_key,
 		       COALESCE(lighter_wallet_addr, '') as lighter_wallet_addr,
 		       COALESCE(lighter_private_key, '') as lighter_private_key,
+		       COALESCE(okx_passphrase, '') as okx_passphrase,
 		       created_at, updated_at
 		FROM exchanges WHERE user_id = ? ORDER BY id
 	`, userID)
@@ -893,6 +894,7 @@ func (d *Database) GetExchanges(userID string) ([]*ExchangeConfig, error) {
 			&exchange.HyperliquidWalletAddr, &exchange.AsterUser,
 			&exchange.AsterSigner, &exchange.AsterPrivateKey,
 			&exchange.LighterWalletAddr, &exchange.LighterPrivateKey,
+			&exchange.OKXPassphrase,
 			&exchange.CreatedAt, &exchange.UpdatedAt,
 		)
 		if err != nil {
@@ -904,6 +906,7 @@ func (d *Database) GetExchanges(userID string) ([]*ExchangeConfig, error) {
 		exchange.SecretKey = d.decryptSensitiveData(exchange.SecretKey)
 		exchange.AsterPrivateKey = d.decryptSensitiveData(exchange.AsterPrivateKey)
 		exchange.LighterPrivateKey = d.decryptSensitiveData(exchange.LighterPrivateKey)
+		exchange.OKXPassphrase = d.decryptSensitiveData(exchange.OKXPassphrase)
 
 		exchanges = append(exchanges, &exchange)
 	}
@@ -912,8 +915,8 @@ func (d *Database) GetExchanges(userID string) ([]*ExchangeConfig, error) {
 }
 
 // UpdateExchange 更新交易所配置，如果不存在则创建用户特定配置
-// 🔒 安全特性：空值不会覆盖现有的敏感字段（api_key, secret_key, aster_private_key, lighter_private_key）
-func (d *Database) UpdateExchange(userID, id string, enabled bool, apiKey, secretKey string, testnet bool, hyperliquidWalletAddr, asterUser, asterSigner, asterPrivateKey, lighterWalletAddr, lighterPrivateKey string) error {
+// 🔒 安全特性：空值不会覆盖现有的敏感字段（api_key, secret_key, aster_private_key, lighter_private_key, okx_passphrase）
+func (d *Database) UpdateExchange(userID, id string, enabled bool, apiKey, secretKey string, testnet bool, hyperliquidWalletAddr, asterUser, asterSigner, asterPrivateKey, lighterWalletAddr, lighterPrivateKey, okxPassphrase string) error {
 	log.Printf("🔧 UpdateExchange: userID=%s, id=%s, enabled=%v", userID, id, enabled)
 
 	// 构建动态 UPDATE SET 子句
@@ -952,6 +955,12 @@ func (d *Database) UpdateExchange(userID, id string, enabled bool, apiKey, secre
 		encryptedLighterPrivateKey := d.encryptSensitiveData(lighterPrivateKey)
 		setClauses = append(setClauses, "lighter_private_key = ?")
 		args = append(args, encryptedLighterPrivateKey)
+	}
+
+	if okxPassphrase != "" {
+		encryptedOKXPassphrase := d.encryptSensitiveData(okxPassphrase)
+		setClauses = append(setClauses, "okx_passphrase = ?")
+		args = append(args, encryptedOKXPassphrase)
 	}
 
 	// WHERE 条件
@@ -994,6 +1003,9 @@ func (d *Database) UpdateExchange(userID, id string, enabled bool, apiKey, secre
 		} else if id == "hyperliquid" {
 			name = "Hyperliquid"
 			typ = "dex"
+		} else if id == "okx" {
+			name = "OKX Futures"
+			typ = "cex"
 		} else if id == "aster" {
 			name = "Aster DEX"
 			typ = "dex"
@@ -1012,14 +1024,15 @@ func (d *Database) UpdateExchange(userID, id string, enabled bool, apiKey, secre
 		encryptedSecretKey := d.encryptSensitiveData(secretKey)
 		encryptedAsterPrivateKey := d.encryptSensitiveData(asterPrivateKey)
 		encryptedLighterPrivateKey := d.encryptSensitiveData(lighterPrivateKey)
+		encryptedOKXPassphrase := d.encryptSensitiveData(okxPassphrase)
 
 		// 创建用户特定的配置，使用原始的交易所ID
 		_, err = d.db.Exec(`
 			INSERT INTO exchanges (id, user_id, name, type, enabled, api_key, secret_key, testnet,
 			                       hyperliquid_wallet_addr, aster_user, aster_signer, aster_private_key,
-			                       lighter_wallet_addr, lighter_private_key, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-		`, id, userID, name, typ, enabled, encryptedAPIKey, encryptedSecretKey, testnet, hyperliquidWalletAddr, asterUser, asterSigner, encryptedAsterPrivateKey, lighterWalletAddr, encryptedLighterPrivateKey)
+			                       lighter_wallet_addr, lighter_private_key, okx_passphrase, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+		`, id, userID, name, typ, enabled, encryptedAPIKey, encryptedSecretKey, testnet, hyperliquidWalletAddr, asterUser, asterSigner, encryptedAsterPrivateKey, lighterWalletAddr, encryptedLighterPrivateKey, encryptedOKXPassphrase)
 
 		if err != nil {
 			log.Printf("❌ UpdateExchange: 创建记录失败: %v", err)
