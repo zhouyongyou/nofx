@@ -35,6 +35,8 @@ import {
   HelpCircle,
   Radio,
   Pencil,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { confirmToast } from '../lib/notify'
 import { toast } from 'sonner'
@@ -1801,11 +1803,8 @@ function ExchangeConfigModal({
     null | 'hyperliquid' | 'aster'
   >(null)
 
-// 顯示/隱藏敏感資訊
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [showSecretKey, setShowSecretKey] = useState(false)
+  // 顯示/隱藏 OKX Passphrase
   const [showPassphrase, setShowPassphrase] = useState(false)
-  const [showAsterPrivateKey, setShowAsterPrivateKey] = useState(false)
 
 
   // 获取当前编辑的交易所信息
