@@ -522,47 +522,65 @@ func TestOKXTrader_FormatQuantity(t *testing.T) {
 	trader := &OKXTrader{}
 
 	tests := []struct {
-		name     string
-		symbol   string
-		quantity float64
-		expected string
+		name        string
+		symbol      string
+		quantity    float64
+		expected    string
+		expectError bool
 	}{
 		{
 			name:     "整数数量",
 			symbol:   "BTCUSDT",
 			quantity: 1.0,
-			expected: "1.0000",
+			expected: "1", // 智能格式化：移除尾隨零
 		},
 		{
 			name:     "小数数量",
 			symbol:   "BTCUSDT",
 			quantity: 0.5,
-			expected: "0.5000",
+			expected: "0.5", // 智能格式化：移除尾隨零
 		},
 		{
-			name:     "多位小数（四舍五入到4位）",
+			name:     "多位小数（保留8位精度）",
 			symbol:   "BTCUSDT",
 			quantity: 0.123456,
-			expected: "0.1235",
+			expected: "0.123456", // 保留原始精度，不四捨五入
 		},
 		{
-			name:     "零数量",
-			symbol:   "BTCUSDT",
-			quantity: 0,
-			expected: "0.0000",
+			name:        "零数量（應返回錯誤）",
+			symbol:      "BTCUSDT",
+			quantity:    0,
+			expected:    "0",
+			expectError: true, // 零是無效的數量
 		},
 		{
 			name:     "大数量",
 			symbol:   "BTCUSDT",
 			quantity: 100.123,
-			expected: "100.1230",
+			expected: "100.123", // 智能格式化：移除尾隨零
+		},
+		{
+			name:     "8位小数（完整精度）",
+			symbol:   "BTCUSDT",
+			quantity: 0.12345678,
+			expected: "0.12345678", // 最大 8 位精度
+		},
+		{
+			name:     "超過8位小数（截斷）",
+			symbol:   "BTCUSDT",
+			quantity: 0.123456789,
+			expected: "0.12345679", // 超過 8 位會被截斷
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := trader.FormatQuantity(tt.symbol, tt.quantity)
-			assert.NoError(t, err)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.expected, result)
 		})
 	}
