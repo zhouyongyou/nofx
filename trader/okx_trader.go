@@ -313,12 +313,17 @@ func (t *OKXTrader) GetPositions() ([]map[string]interface{}, error) {
 			quantity = -quantity // 空倉顯示負數
 		}
 
-		// 標準化 symbol：BTC-USDT-SWAP → BTCUSDT（安全獲取）
+		// 標準化 symbol：OKX 格式 → 通用格式（安全獲取）
+		// 例如：BTC-USDT-SWAP → BTCUSDT
+		//       ETH-USDC-SWAP → ETHUSDC
+		//       BTC-USD-SWAP → BTCUSD
 		instId, ok := pos["instId"].(string)
 		if !ok {
 			continue
 		}
-		symbol := strings.ReplaceAll(strings.ReplaceAll(instId, "-USDT-SWAP", ""), "-", "")
+		// 移除 -SWAP 後綴，然後移除所有分隔符
+		symbol := strings.TrimSuffix(instId, "-SWAP")
+		symbol = strings.ReplaceAll(symbol, "-", "")
 
 		position := map[string]interface{}{
 			"symbol":             symbol,
@@ -345,12 +350,39 @@ func (t *OKXTrader) GetPositions() ([]map[string]interface{}, error) {
 	return positions, nil
 }
 
-// formatSymbol 將 symbol 轉換為 OKX 格式
-// BTCUSDT → BTC-USDT-SWAP
+// formatSymbol 將交易對轉換為 OKX 永續合約格式
+// 支持多種結算貨幣：USDT、USDC、USD
+// 例如：BTCUSDT → BTC-USDT-SWAP
+//       ETHUSDC → ETH-USDC-SWAP
+//       BTCUSD  → BTC-USD-SWAP (幣本位)
 func (t *OKXTrader) formatSymbol(symbol string) string {
-	// 移除 USDT 後綴，然後加上 -USDT-SWAP
-	base := strings.TrimSuffix(strings.ToUpper(symbol), "USDT")
-	return base + "-USDT-SWAP"
+	symbol = strings.ToUpper(symbol)
+
+	// 如果已經是 OKX 格式（包含 -SWAP），直接返回
+	if strings.Contains(symbol, "-SWAP") {
+		return symbol
+	}
+
+	// 如果已經是標準格式（例如 BTC-USDT-SWAP），直接返回
+	if strings.Count(symbol, "-") >= 2 {
+		return symbol
+	}
+
+	// 檢查常見的結算貨幣後綴（優先級：USDT > USDC > USD）
+	// 注意：必須先檢查較長的後綴（USDT/USDC），再檢查 USD
+	if strings.HasSuffix(symbol, "USDT") {
+		base := strings.TrimSuffix(symbol, "USDT")
+		return base + "-USDT-SWAP"
+	} else if strings.HasSuffix(symbol, "USDC") {
+		base := strings.TrimSuffix(symbol, "USDC")
+		return base + "-USDC-SWAP"
+	} else if strings.HasSuffix(symbol, "USD") {
+		base := strings.TrimSuffix(symbol, "USD")
+		return base + "-USD-SWAP"
+	}
+
+	// 默認使用 USDT 結算（適用於只有幣種名稱的情況，如 "BTC" → "BTC-USDT-SWAP"）
+	return symbol + "-USDT-SWAP"
 }
 
 // OpenLong 開多倉
