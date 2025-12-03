@@ -321,9 +321,7 @@ func (t *OKXTrader) GetPositions() ([]map[string]interface{}, error) {
 		if !ok {
 			continue
 		}
-		// 移除 -SWAP 後綴，然後移除所有分隔符
-		symbol := strings.TrimSuffix(instId, "-SWAP")
-		symbol = strings.ReplaceAll(symbol, "-", "")
+		symbol := t.extractBaseSymbol(instId)
 
 		position := map[string]interface{}{
 			"symbol":             symbol,
@@ -331,6 +329,7 @@ func (t *OKXTrader) GetPositions() ([]map[string]interface{}, error) {
 			"entry_price":        entryPrice,
 			"mark_price":         markPrice,
 			"quantity":           quantity,
+			"positionAmt":        quantity,
 			"leverage":           int(leverage),
 			"unrealized_pnl":     upl,
 			"unrealized_pnl_pct": uplPct,
@@ -353,8 +352,9 @@ func (t *OKXTrader) GetPositions() ([]map[string]interface{}, error) {
 // formatSymbol 將交易對轉換為 OKX 永續合約格式
 // 支持多種結算貨幣：USDT、USDC、USD
 // 例如：BTCUSDT → BTC-USDT-SWAP
-//       ETHUSDC → ETH-USDC-SWAP
-//       BTCUSD  → BTC-USD-SWAP (幣本位)
+//
+//	ETHUSDC → ETH-USDC-SWAP
+//	BTCUSD  → BTC-USD-SWAP (幣本位)
 func (t *OKXTrader) formatSymbol(symbol string) string {
 	symbol = strings.ToUpper(symbol)
 
@@ -397,12 +397,20 @@ func (t *OKXTrader) OpenShort(symbol string, quantity float64, leverage int) (ma
 
 // CloseLong 平多倉
 func (t *OKXTrader) CloseLong(symbol string, quantity float64) (map[string]interface{}, error) {
-	return t.placeOrder(symbol, "sell", "long", quantity, 0)
+	resolvedQty, err := t.resolveCloseQuantity(symbol, "long", quantity)
+	if err != nil {
+		return nil, err
+	}
+	return t.placeOrder(symbol, "sell", "long", resolvedQty, 0)
 }
 
 // CloseShort 平空倉
 func (t *OKXTrader) CloseShort(symbol string, quantity float64) (map[string]interface{}, error) {
-	return t.placeOrder(symbol, "buy", "short", quantity, 0)
+	resolvedQty, err := t.resolveCloseQuantity(symbol, "short", quantity)
+	if err != nil {
+		return nil, err
+	}
+	return t.placeOrder(symbol, "buy", "short", resolvedQty, 0)
 }
 
 // placeOrder 下單核心邏輯
@@ -419,10 +427,10 @@ func (t *OKXTrader) placeOrder(symbol, side, posSide string, quantity float64, l
 	// 構建訂單參數
 	params := map[string]interface{}{
 		"instId":  instId,
-		"tdMode":  "cross",                        // 全倉模式
-		"side":    side,                           // buy/sell
-		"posSide": posSide,                        // long/short
-		"ordType": "market",                       // 市價單
+		"tdMode":  "cross",                          // 全倉模式
+		"side":    side,                             // buy/sell
+		"posSide": posSide,                          // long/short
+		"ordType": "market",                         // 市價單
 		"sz":      t.formatQuantityString(quantity), // 智能格式化數量
 	}
 
@@ -437,7 +445,7 @@ func (t *OKXTrader) placeOrder(symbol, side, posSide string, quantity float64, l
 	// 清除緩存
 	t.clearCache()
 
-	return result, nil
+	return t.normalizeOrderResult(result, symbol, instId, side, posSide, quantity), nil
 }
 
 // SetLeverage 設置槓桿
@@ -515,16 +523,12 @@ func (t *OKXTrader) GetMarketPrice(symbol string) (float64, error) {
 
 // SetStopLoss 設置止損單
 func (t *OKXTrader) SetStopLoss(symbol string, positionSide string, quantity, stopPrice float64) error {
-	log.Printf("🟠 [OKX] 設置止損: %s %s, 止損價=%.2f", symbol, positionSide, stopPrice)
-	// TODO: 實現止損邏輯
-	return fmt.Errorf("OKX 止損功能尚未實現")
+	return t.submitConditionalOrder(symbol, positionSide, quantity, stopPrice, "stop_loss")
 }
 
 // SetTakeProfit 設置止盈單
 func (t *OKXTrader) SetTakeProfit(symbol string, positionSide string, quantity, takeProfitPrice float64) error {
-	log.Printf("🟠 [OKX] 設置止盈: %s %s, 止盈價=%.2f", symbol, positionSide, takeProfitPrice)
-	// TODO: 實現止盈邏輯
-	return fmt.Errorf("OKX 止盈功能尚未實現")
+	return t.submitConditionalOrder(symbol, positionSide, quantity, takeProfitPrice, "take_profit")
 }
 
 // CancelStopLossOrders 取消止損單
@@ -585,6 +589,143 @@ func (t *OKXTrader) formatQuantityString(quantity float64) string {
 		return fmt.Sprintf("%.4f", quantity)
 	}
 	return formatted
+}
+
+// formatPriceString 將價格轉為 OKX 接受的字串格式
+func (t *OKXTrader) formatPriceString(price float64) string {
+	formatted := fmt.Sprintf("%.8f", price)
+	formatted = strings.TrimRight(formatted, "0")
+	formatted = strings.TrimRight(formatted, ".")
+	if formatted == "" {
+		return fmt.Sprintf("%.4f", price)
+	}
+	return formatted
+}
+
+// submitConditionalOrder 提交止盈/止損訂單
+func (t *OKXTrader) submitConditionalOrder(symbol, positionSide string, quantity, triggerPrice float64, purpose string) error {
+	if quantity <= 0 {
+		return fmt.Errorf("無效的數量: %.4f", quantity)
+	}
+	if triggerPrice <= 0 {
+		return fmt.Errorf("無效的觸發價格: %.4f", triggerPrice)
+	}
+
+	instId := t.formatSymbol(symbol)
+	posSide := strings.ToLower(positionSide)
+	if posSide != "long" && posSide != "short" {
+		posSide = "long"
+	}
+
+	side := "sell"
+	if posSide == "short" {
+		side = "buy"
+	}
+
+	triggerPx := t.formatPriceString(triggerPrice)
+	params := map[string]interface{}{
+		"instId":  instId,
+		"tdMode":  "cross",
+		"side":    side,
+		"posSide": posSide,
+		"ordType": "conditional",
+		"sz":      t.formatQuantityString(quantity),
+	}
+
+	orderLabel := "止損單"
+	if purpose == "take_profit" {
+		orderLabel = "止盈單"
+		params["tpTriggerPx"] = triggerPx
+		params["tpOrdPx"] = "-1" // 根據官方建議，-1 代表市價
+	} else {
+		params["slTriggerPx"] = triggerPx
+		params["slOrdPx"] = "-1"
+	}
+
+	log.Printf("🟠 [OKX] 設置%s: %s %s, 觸發價=%s, 數量=%s", orderLabel, instId, posSide, triggerPx, params["sz"])
+
+	if _, err := t.request("POST", "/api/v5/trade/order", params); err != nil {
+		return fmt.Errorf("設置%s失敗: %w", orderLabel, err)
+	}
+
+	log.Printf("  ✓ %s設置成功", orderLabel)
+	return nil
+}
+
+// normalizeOrderResult 將 OKX 訂單響應轉換為統一格式
+func (t *OKXTrader) normalizeOrderResult(result map[string]interface{}, symbol, instId, side, posSide string, quantity float64) map[string]interface{} {
+	normalized := map[string]interface{}{
+		"symbol":   strings.ToUpper(symbol),
+		"instId":   instId,
+		"side":     side,
+		"posSide":  posSide,
+		"quantity": quantity,
+		"status":   "success",
+		"raw":      result,
+	}
+
+	if data, ok := result["data"].([]interface{}); ok && len(data) > 0 {
+		if entry, ok := data[0].(map[string]interface{}); ok {
+			if v, ok := entry["ordId"]; ok {
+				normalized["orderId"] = v
+			}
+			if v, ok := entry["clOrdId"]; ok {
+				normalized["clientOrderId"] = v
+			}
+			if v, ok := entry["sCode"]; ok {
+				normalized["statusCode"] = v
+			}
+			if v, ok := entry["sMsg"]; ok && v != "" {
+				normalized["message"] = v
+			}
+		}
+	}
+
+	return normalized
+}
+
+// resolveCloseQuantity 根據現有倉位決定實際平倉數量
+func (t *OKXTrader) resolveCloseQuantity(symbol, posSide string, requestedQty float64) (float64, error) {
+	if requestedQty > 0 {
+		return requestedQty, nil
+	}
+
+	positions, err := t.GetPositions()
+	if err != nil {
+		return 0, err
+	}
+
+	targetSymbol := t.extractBaseSymbol(symbol)
+	for _, position := range positions {
+		sym, _ := position["symbol"].(string)
+		side, _ := position["side"].(string)
+		qty, _ := position["quantity"].(float64)
+		if strings.EqualFold(sym, targetSymbol) && strings.EqualFold(side, posSide) && qty > 0 {
+			return qty, nil
+		}
+	}
+
+	return 0, fmt.Errorf("沒有可平倉的倉位: %s %s", symbol, posSide)
+}
+
+// extractBaseSymbol 提取底層資產名稱 (例如 BTC-USDT-SWAP → BTC)
+func (t *OKXTrader) extractBaseSymbol(symbol string) string {
+	upper := strings.ToUpper(symbol)
+	upper = strings.TrimSuffix(upper, "-SWAP")
+	if strings.Contains(upper, "-") {
+		parts := strings.Split(upper, "-")
+		if len(parts) > 0 && parts[0] != "" {
+			return parts[0]
+		}
+	}
+
+	for _, suffix := range []string{"USDT", "USDC", "USD"} {
+		if strings.HasSuffix(upper, suffix) {
+			return strings.TrimSuffix(upper, suffix)
+		}
+	}
+
+	return strings.ReplaceAll(upper, "-", "")
 }
 
 // clearCache 清除緩存

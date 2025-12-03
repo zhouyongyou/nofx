@@ -573,6 +573,7 @@ func (d *Database) migrateExchangesTable() error {
 			lighter_wallet_addr TEXT DEFAULT '',
 			lighter_private_key TEXT DEFAULT '',
 			lighter_api_key_private_key TEXT DEFAULT '',
+			okx_passphrase TEXT DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id, user_id),
@@ -583,11 +584,32 @@ func (d *Database) migrateExchangesTable() error {
 		return fmt.Errorf("创建新exchanges表失败: %w", err)
 	}
 
+	columnList := `
+		id,
+		user_id,
+		name,
+		type,
+		enabled,
+		api_key,
+		secret_key,
+		testnet,
+		hyperliquid_wallet_addr,
+		aster_user,
+		aster_signer,
+		aster_private_key,
+		lighter_wallet_addr,
+		lighter_private_key,
+		lighter_api_key_private_key,
+		okx_passphrase,
+		created_at,
+		updated_at
+	`
+
 	// 复制数据到新表
-	_, err = d.db.Exec(`
-		INSERT INTO exchanges_new 
-		SELECT * FROM exchanges
-	`)
+	_, err = d.db.Exec(fmt.Sprintf(`
+		INSERT INTO exchanges_new (%s)
+		SELECT %s FROM exchanges
+	`, columnList, columnList))
 	if err != nil {
 		return fmt.Errorf("复制数据失败: %w", err)
 	}
@@ -1146,16 +1168,8 @@ func (d *Database) GetExchanges(userID string) ([]*ExchangeConfig, error) {
 		       COALESCE(aster_private_key, '') as aster_private_key,
 		       COALESCE(lighter_wallet_addr, '') as lighter_wallet_addr,
 		       COALESCE(lighter_private_key, '') as lighter_private_key,
-	       COALESCE(lighter_api_key_private_key, '') as lighter_api_key_private_key,
-	       COALESCE(okx_passphrase, '') as okx_passphrase,
-	       COALESCE(lighter_api_key_private_key, '') as lighter_api_key_private_key,
-	       COALESCE(okx_passphrase, '') as okx_passphrase,
-	       COALESCE(lighter_api_key_private_key, '') as lighter_api_key_private_key,
-	       COALESCE(okx_passphrase, '') as okx_passphrase,
-	       COALESCE(lighter_api_key_private_key, '') as lighter_api_key_private_key,
-	       COALESCE(okx_passphrase, '') as okx_passphrase,
-	       COALESCE(lighter_api_key_private_key, '') as lighter_api_key_private_key,
-	       COALESCE(okx_passphrase, '') as okx_passphrase,
+		       COALESCE(lighter_api_key_private_key, '') as lighter_api_key_private_key,
+		       COALESCE(okx_passphrase, '') as okx_passphrase,
 		       created_at, updated_at
 		FROM exchanges WHERE user_id = ? ORDER BY id
 	`, userID)
