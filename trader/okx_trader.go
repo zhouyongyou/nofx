@@ -419,11 +419,11 @@ func (t *OKXTrader) placeOrder(symbol, side, posSide string, quantity float64, l
 	// 構建訂單參數
 	params := map[string]interface{}{
 		"instId":  instId,
-		"tdMode":  "cross",  // 全倉模式
-		"side":    side,     // buy/sell
-		"posSide": posSide,  // long/short
-		"ordType": "market", // 市價單
-		"sz":      fmt.Sprintf("%f", quantity),
+		"tdMode":  "cross",                        // 全倉模式
+		"side":    side,                           // buy/sell
+		"posSide": posSide,                        // long/short
+		"ordType": "market",                       // 市價單
+		"sz":      t.formatQuantityString(quantity), // 智能格式化數量
 	}
 
 	log.Printf("🟠 [OKX] 下單: %s %s %s, 數量=%.4f", instId, side, posSide, quantity)
@@ -556,11 +556,35 @@ func (t *OKXTrader) CancelStopOrders(symbol string) error {
 	return nil
 }
 
-// FormatQuantity 格式化數量到正確的精度
+// FormatQuantity 格式化數量為符合 OKX API 要求的字符串
+// OKX 不同合約有不同的數量精度要求，這裡使用智能格式化：
+// - 自動移除尾隨的零
+// - 最大 8 位小數（足夠處理大部分加密貨幣）
+// - 保留有效數字
 func (t *OKXTrader) FormatQuantity(symbol string, quantity float64) (string, error) {
-	// OKX 通常使用合約數量（contracts），不同幣種精度不同
-	// 這裡暫時返回標準格式
-	return fmt.Sprintf("%.4f", quantity), nil
+	// 使用 8 位小數精度格式化
+	formatted := fmt.Sprintf("%.8f", quantity)
+
+	// 移除尾隨的零和小數點（如果全是零）
+	formatted = strings.TrimRight(formatted, "0")
+	formatted = strings.TrimRight(formatted, ".")
+
+	// 如果結果為空或無效，返回錯誤
+	if formatted == "" || formatted == "0" {
+		return "0", fmt.Errorf("無效的數量: %f", quantity)
+	}
+
+	return formatted, nil
+}
+
+// formatQuantityString 內部輔助函數，直接格式化數量（不返回錯誤）
+func (t *OKXTrader) formatQuantityString(quantity float64) string {
+	formatted, err := t.FormatQuantity("", quantity)
+	if err != nil {
+		// 降級處理：使用固定精度
+		return fmt.Sprintf("%.4f", quantity)
+	}
+	return formatted
 }
 
 // clearCache 清除緩存
